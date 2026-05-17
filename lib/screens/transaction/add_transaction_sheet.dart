@@ -80,7 +80,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
 
   double? _safeEval(String expr) {
     // Simple left-to-right evaluation of + and -
-    final parts = <dynamic>[];
+    final parts = <Object>[];
     final regex = RegExp(r'(\d+\.?\d*|[+\-])');
     for (final m in regex.allMatches(expr)) {
       final token = m.group(0)!;
@@ -90,7 +90,10 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
         parts.add(double.parse(token));
       }
     }
-    if (parts.isEmpty || parts.first is String) return null;
+    // Must start with a number and end with a number
+    if (parts.length < 3 || parts.first is! double || parts.last is! double) {
+      return null;
+    }
     double result = parts.first as double;
     for (int i = 1; i < parts.length - 1; i += 2) {
       final op = parts[i] as String;
@@ -101,8 +104,6 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
         result -= val;
       }
     }
-    // Check if there was actual computation
-    if (parts.length == 1) return null;
     return result;
   }
 

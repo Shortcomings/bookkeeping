@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/transaction_provider.dart';
+import '../../models/transaction.dart';
 import 'add_transaction_sheet.dart';
 
 class TransactionListScreen extends StatelessWidget {
@@ -124,7 +125,7 @@ class TransactionListScreen extends StatelessWidget {
 }
 
 class _TransactionCard extends StatelessWidget {
-  final dynamic transaction;
+  final Transaction transaction;
   final VoidCallback onTap;
 
   const _TransactionCard({required this.transaction, required this.onTap});
@@ -136,7 +137,7 @@ class _TransactionCard extends StatelessWidget {
     final isExpense = transaction.type == 0;
     final amount = NumberFormat.currency(symbol: '¥', decimalDigits: 2)
         .format(transaction.amount / 100);
-    final note = transaction.note as String?;
+    final note = transaction.note;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 4),
