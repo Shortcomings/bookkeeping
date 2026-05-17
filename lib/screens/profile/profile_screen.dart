@@ -8,6 +8,8 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import '../../providers/transaction_provider.dart';
 import '../../models/transaction.dart';
+import '../category/category_list_screen.dart';
+import '../budget/budget_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -212,6 +214,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Card(
             child: Column(
               children: [
+                ListTile(
+                  leading: const Icon(Icons.savings_outlined),
+                  title: const Text('预算管理'),
+                  subtitle: const Text('设置月度预算、控制支出'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChangeNotifierProvider.value(
+                        value: provider,
+                        child: const BudgetScreen(),
+                      ),
+                    ),
+                  ),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
+                  leading: const Icon(Icons.category_outlined),
+                  title: const Text('分类管理'),
+                  subtitle: const Text('管理收支分类、图标和排序'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChangeNotifierProvider.value(
+                        value: provider,
+                        child: const CategoryListScreen(),
+                      ),
+                    ),
+                  ),
+                ),
+                const Divider(height: 1, indent: 56),
                 ListTile(
                   leading: const Icon(Icons.file_download_outlined),
                   title: const Text('导出数据'),

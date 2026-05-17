@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../providers/transaction_provider.dart';
 import '../../models/transaction.dart';
 import 'add_transaction_sheet.dart';
+import '../search/search_screen.dart';
 
 class TransactionListScreen extends StatelessWidget {
   const TransactionListScreen({super.key});
@@ -13,7 +14,23 @@ class TransactionListScreen extends StatelessWidget {
     final provider = context.watch<TransactionProvider>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('账单')),
+      appBar: AppBar(
+        title: const Text('账单'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChangeNotifierProvider.value(
+                  value: provider,
+                  child: const SearchScreen(),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: provider.transactions.isEmpty
           ? _EmptyState()
           : RefreshIndicator(

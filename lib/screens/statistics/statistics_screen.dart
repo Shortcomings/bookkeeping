@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../providers/transaction_provider.dart';
+import 'comparison_view.dart';
 
 class StatisticsScreen extends StatefulWidget {
   const StatisticsScreen({super.key});
@@ -21,7 +22,7 @@ class _StatisticsScreenState extends State<StatisticsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         setState(() {
@@ -51,9 +52,12 @@ class _StatisticsScreenState extends State<StatisticsScreen>
       start = DateFormat('yyyy-MM-dd').format(DateTime(now.year, now.month, 1));
       end = DateFormat('yyyy-MM-dd')
           .format(DateTime(now.year, now.month + 1, 0));
-    } else {
+    } else if (_selectedTab == 2) {
       start = DateFormat('yyyy-MM-dd').format(DateTime(now.year, 1, 1));
       end = DateFormat('yyyy-MM-dd').format(DateTime(now.year, 12, 31));
+    } else {
+      start = DateFormat('yyyy-MM-dd').format(now);
+      end = start;
     }
     return (start, end);
   }
@@ -117,7 +121,7 @@ class _StatisticsScreenState extends State<StatisticsScreen>
       colorIndex++;
     }
 
-    final tabLabels = ['本周', '本月', '本年'];
+    final tabLabels = ['本周', '本月', '本年', '对比'];
 
     return Scaffold(
       appBar: AppBar(
@@ -127,7 +131,9 @@ class _StatisticsScreenState extends State<StatisticsScreen>
           tabs: tabLabels.map((l) => Tab(text: l)).toList(),
         ),
       ),
-      body: filteredTxs.isEmpty
+      body: _selectedTab == 3
+          ? const ComparisonView()
+          : filteredTxs.isEmpty
           ? Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,

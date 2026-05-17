@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../providers/transaction_provider.dart';
 import '../../models/transaction.dart';
 import '../transaction/add_transaction_sheet.dart';
+import '../budget/budget_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final ValueChanged<int>? onTabChange;
@@ -66,6 +67,22 @@ class HomeScreen extends StatelessWidget {
                   monthExpense: currencyFormat.format(monthExpense / 100),
                   monthIncome: currencyFormat.format(monthIncome / 100),
                   balance: currencyFormat.format((monthIncome - monthExpense) / 100),
+                ),
+                const SizedBox(height: 16),
+
+                // 预算概览
+                _BudgetPreview(
+                  monthPrefix: monthPrefix,
+                  monthExpense: monthExpense,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChangeNotifierProvider.value(
+                        value: provider,
+                        child: const BudgetScreen(),
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 16),
 
@@ -264,6 +281,94 @@ class _TransactionTile extends StatelessWidget {
             color: isExpense
                 ? Theme.of(context).colorScheme.error
                 : Theme.of(context).colorScheme.tertiary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BudgetPreview extends StatelessWidget {
+  final String monthPrefix;
+  final int monthExpense;
+  final VoidCallback onTap;
+
+  const _BudgetPreview({
+    required this.monthPrefix,
+    required this.monthExpense,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.read<TransactionProvider>();
+    final budget = provider.getTotalBudget(monthPrefix);
+    if (budget == null) return const SizedBox.shrink();
+
+    final progress = budget.totalAmount > 0
+        ? monthExpense / budget.totalAmount
+        : 0.0;
+    final currencyFormat =
+        NumberFormat.currency(symbol: '¥', decimalDigits: 2);
+
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.savings_outlined, size: 18),
+                  const SizedBox(width: 8),
+                  Text('本月预算',
+                      style: Theme.of(context).textTheme.bodyMedium),
+                  const Spacer(),
+                  Text(currencyFormat.format(budget.totalAmount / 100),
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w600)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(3),
+                child: LinearProgressIndicator(
+                  value: progress.clamp(0.0, 1.0),
+                  minHeight: 6,
+                  color: progress < 0.5
+                      ? Colors.green
+                      : progress < 0.8
+                          ? Colors.orange
+                          : Theme.of(context).colorScheme.error,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '已花 ${currencyFormat.format(monthExpense / 100)}',
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                  Text(
+                    '${(progress * 100).toStringAsFixed(0)}%',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: progress >= 0.8
+                              ? Theme.of(context).colorScheme.error
+                              : null,
+                          fontWeight: progress >= 0.8
+                              ? FontWeight.w600
+                              : null,
+                        ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
