@@ -339,21 +339,25 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
             style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               hintText: '0.00',
               prefixText: '¥ ',
-              border: const OutlineInputBorder(),
-              suffixText: evaluated != null
-                  ? '= ${NumberFormat.currency(symbol: '¥', decimalDigits: 2).format(evaluated)}'
-                  : null,
-              suffixTextStyle: TextStyle(
-                color: Theme.of(context).colorScheme.primary,
-                fontWeight: FontWeight.w600,
-              ),
+              border: OutlineInputBorder(),
             ),
             onChanged: (v) => setState(() => _amount = v),
             controller: _amountController,
           ),
+          if (evaluated != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, left: 12),
+              child: Text(
+                '= ${NumberFormat.currency(symbol: '¥', decimalDigits: 2).format(evaluated)}',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           if (!_isSmartMode && evaluated == null && _amount.contains(RegExp(r'[+\-]')))
             Padding(
               padding: const EdgeInsets.only(top: 4, left: 12),

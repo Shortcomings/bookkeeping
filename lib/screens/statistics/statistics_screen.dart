@@ -138,7 +138,7 @@ class _StatisticsScreenState extends State<StatisticsScreen>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.pie_chart_outlined,
+                  Icon(Icons.pie_chart_outline,
                       size: 64,
                       color: Theme.of(context).colorScheme.outline.withAlpha(100)),
                   const SizedBox(height: 16),

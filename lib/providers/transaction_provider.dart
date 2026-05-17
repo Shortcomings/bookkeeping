@@ -1,6 +1,7 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' hide Category;
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import 'package:sqflite/sqflite.dart' hide Transaction;
 import '../database/database_helper.dart';
 import '../models/transaction.dart';
 import '../models/category.dart';
@@ -503,7 +504,7 @@ class TransactionProvider extends ChangeNotifier {
       final budget = Budget(
         id: _uuid.v4(),
         month: month,
-        totalAmount: totalAmount,
+        totalAmount: amount,
         categoryId: categoryId,
         createdAt: now,
         updatedAt: now,
@@ -685,7 +686,6 @@ class TransactionProvider extends ChangeNotifier {
       return true;
     }).toList();
   }
-}
 
   // ==================== 周期记账 ====================
 

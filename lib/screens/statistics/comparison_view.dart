@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -389,7 +390,7 @@ class _TrendPainter extends CustomPainter {
     }
 
     // Draw labels
-    final tp = TextPainter(textDirection: TextDirection.ltr);
+    final tp = TextPainter(textDirection: ui.TextDirection.ltr);
     for (int i = 0; i < trend.length; i++) {
       if (i % 2 == 0) {
         tp.text = TextSpan(

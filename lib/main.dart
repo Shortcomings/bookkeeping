@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/transaction_provider.dart';
+import 'database/db_factory.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/transaction/transaction_list_screen.dart';
 import 'screens/statistics/statistics_screen.dart';
@@ -9,6 +10,7 @@ import 'screens/profile/profile_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  initDatabaseFactory();
   final provider = TransactionProvider();
   await provider.init();
 
@@ -77,7 +79,7 @@ class _MainScreenState extends State<MainScreen> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: '首页'),
           NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: '账单'),
-          NavigationDestination(icon: Icon(Icons.pie_chart_outlined), selectedIcon: Icon(Icons.pie_chart), label: '统计'),
+          NavigationDestination(icon: Icon(Icons.pie_chart_outline), selectedIcon: Icon(Icons.pie_chart), label: '统计'),
           NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: '资产'),
           NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: '我的'),
         ],

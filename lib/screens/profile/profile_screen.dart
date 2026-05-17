@@ -104,12 +104,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final sheet = excel['账单导出'];
 
     sheet.appendRow([
-      const TextCellValue('日期'),
-      const TextCellValue('类型'),
-      const TextCellValue('分类'),
-      const TextCellValue('金额(元)'),
-      const TextCellValue('账户'),
-      const TextCellValue('备注'),
+      TextCellValue('日期'),
+      TextCellValue('类型'),
+      TextCellValue('分类'),
+      TextCellValue('金额(元)'),
+      TextCellValue('账户'),
+      TextCellValue('备注'),
     ]);
 
     for (final tx in txs) {
@@ -138,9 +138,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     if (context.mounted) {
-      await SharePlus.instance.share(
-        ShareParams(files: [XFile(file.path)]),
-      );
+      await Share.shareXFiles([XFile(file.path)]);
     }
   }
 
@@ -172,9 +170,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await file.writeAsString(csvString);
 
     if (context.mounted) {
-      await SharePlus.instance.share(
-        ShareParams(files: [XFile(file.path)]),
-      );
+      await Share.shareXFiles([XFile(file.path)]);
     }
   }
 
