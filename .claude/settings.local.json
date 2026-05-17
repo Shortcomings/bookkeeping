@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(flutter --version)",
+      "Bash(where flutter *)",
+      "Read(//d//**)",
+      "Read(//c//**)",
+      "Read(//c/src/**)",
+      "Read(//c/Users/11564/**)",
+      "Bash(choco list *)",
+      "Bash(choco install *)",
+      "Bash(curl -L -o /tmp/flutter.zip \"https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_3.38.9-stable.zip\")",
+      "Read(//tmp/**)",
+      "Bash(rm -f /tmp/flutter.zip)",
+      "Bash(curl -L -o /tmp/flutter.zip \"https://storage.flutter-io.cn/flutter_infra_release/releases/stable/windows/flutter_windows_3.38.9-stable.zip\")",
+      "Bash(mkdir -p /d/flutter)",
+      "Bash(unzip -o /tmp/flutter.zip -d /d/flutter)",
+      "Bash(export PATH=\"/d/flutter/flutter/bin:$PATH\")",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(export PATH=\"/d/flutter/flutter/bin:/d/flutter/flutter/bin/internal:$PATH\")",
+      "Read(//d/flutter/flutter/bin//**)",
+      "Bash(/d/flutter/flutter/bin/dart --version)",
+      "Bash(timeout 120 flutter create --project-name bookkeeping --org com.bookkeeping --platforms android,ios,web .)",
+      "Bash(timeout 120 flutter pub get)",
+      "Bash(flutter analyze *)",
+      "Read(//c/flutter/bin/**)",
+      "Read(//d/flutter/bin/**)",
+      "Bash(git --version)",
+      "Bash(gh --version)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
+    ]
+  }
+}
