@@ -5,6 +5,7 @@ import '../../providers/transaction_provider.dart';
 import '../../models/transaction.dart';
 import '../transaction/add_transaction_sheet.dart';
 import '../budget/budget_screen.dart';
+import '../periodic/periodic_list_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final ValueChanged<int>? onTabChange;
@@ -85,6 +86,19 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
+
+                // 周期账单
+                _PeriodicBanner(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChangeNotifierProvider.value(
+                        value: provider,
+                        child: const PeriodicListScreen(),
+                      ),
+                    ),
+                  ),
+                ),
 
                 // 今日概览
                 _TodaySummary(
@@ -368,6 +382,51 @@ class _BudgetPreview extends StatelessWidget {
                   ),
                 ],
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PeriodicBanner extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _PeriodicBanner({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.read<TransactionProvider>();
+    final activeCount =
+        provider.periodicTransactions.where((p) => p.isActive).length;
+    final manualCount = provider.periodicTransactions
+        .where((p) => p.isActive && !p.autoConfirm)
+        .length;
+
+    if (activeCount == 0) return const SizedBox.shrink();
+
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              const Icon(Icons.repeat, size: 18),
+              const SizedBox(width: 8),
+              Text('$activeCount 个活跃周期账单',
+                  style: Theme.of(context).textTheme.bodyMedium),
+              if (manualCount > 0) ...[
+                const SizedBox(width: 8),
+                Text('$manualCount 个待确认',
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontSize: 12)),
+              ],
+              const Spacer(),
+              Text('管理', style: Theme.of(context).textTheme.labelSmall),
             ],
           ),
         ),

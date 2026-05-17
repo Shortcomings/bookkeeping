@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/transaction_provider.dart';
 import '../../models/account.dart';
+import '../../services/nlp_parser.dart';
 
 class AddTransactionSheet extends StatefulWidget {
   final String? editTransactionId;
@@ -25,6 +26,9 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
   late TransactionProvider _provider;
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
+  final _nlpController = TextEditingController();
+  bool _isSmartMode = false;
+  NlpResult? _nlpResult;
 
   @override
   void initState() {
@@ -55,6 +59,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
   void dispose() {
     _amountController.dispose();
     _noteController.dispose();
+    _nlpController.dispose();
     super.dispose();
   }
 
@@ -105,6 +110,35 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
       }
     }
     return result;
+  }
+
+  void _onNlpInput(String text) {
+    final result = NlpParser.parse(text);
+    setState(() {
+      _nlpResult = result;
+      if (result.hasAmount) {
+        _amount = result.amount!.toStringAsFixed(2);
+      }
+      if (result.date != null) {
+        _date = DateFormat('yyyy-MM-dd').format(result.date!);
+      }
+      if (result.type != null) {
+        _type = result.type!;
+      }
+      if (result.categoryHint != null) {
+        final provider = _provider;
+        // Map category hint to actual category ID
+        final hint = result.categoryHint!;
+        final cat = provider.categories.firstWhere(
+          (c) => c.name == hint && c.type == _type,
+          orElse: () => provider.categories.firstWhere(
+            (c) => c.name == '其他' && c.type == _type,
+            orElse: () => provider.categories.first,
+          ),
+        );
+        _categoryId = cat.id;
+      }
+    });
   }
 
   Future<void> _save() async {
@@ -210,7 +244,56 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
           ),
           const SizedBox(height: 12),
 
+          // 手动/智能模式切换
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(value: false, label: Text('手动'), icon: Icon(Icons.edit, size: 16)),
+              ButtonSegment(value: true, label: Text('智能'), icon: Icon(Icons.auto_awesome, size: 16)),
+            ],
+            selected: {_isSmartMode},
+            onSelectionChanged: (v) => setState(() {
+              _isSmartMode = v.first;
+              _nlpResult = null;
+              _nlpController.clear();
+            }),
+          ),
+          const SizedBox(height: 12),
+
+          if (_isSmartMode) ...[
+            // 智能输入区域
+            TextField(
+              controller: _nlpController,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: '输入记账内容，如：昨天午饭35元',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: _onNlpInput,
+            ),
+            if (_nlpResult != null) ...[
+              const SizedBox(height: 12),
+              _NlpResultCard(
+                result: _nlpResult!,
+                onAmountTap: () => setState(() => _isSmartMode = false),
+                onDateTap: () async {
+                  final d = await showDatePicker(
+                    context: context,
+                    initialDate: _nlpResult!.date ?? DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2100),
+                  );
+                  if (d != null) {
+                    setState(() => _date = DateFormat('yyyy-MM-dd').format(d));
+                  }
+                },
+                onCategoryTap: () => setState(() => _isSmartMode = false),
+              ),
+            ],
+            const SizedBox(height: 16),
+          ],
+
           // 收/支切换
+          if (!_isSmartMode)
           Row(
             children: [
               _TypeChip(
@@ -248,7 +331,8 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
           ),
           const SizedBox(height: 16),
 
-          // 金额输入
+          // 金额输入 (手动模式)
+          if (!_isSmartMode)
           TextField(
             autofocus: true,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -270,7 +354,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
             onChanged: (v) => setState(() => _amount = v),
             controller: _amountController,
           ),
-          if (evaluated == null && _amount.contains(RegExp(r'[+\-]')))
+          if (!_isSmartMode && evaluated == null && _amount.contains(RegExp(r'[+\-]')))
             Padding(
               padding: const EdgeInsets.only(top: 4, left: 12),
               child: Text(
@@ -282,7 +366,15 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
             ),
           const SizedBox(height: 16),
 
+          // 智能分类建议
+          if (!_isSmartMode)
+          _SmartSuggestion(note: _note, onSelect: (catId) {
+            setState(() => _categoryId = catId);
+          }),
+
           // 分类选择
+          if (!_isSmartMode)
+          if (!_isSmartMode) ...[
           Text('分类', style: Theme.of(context).textTheme.labelLarge),
           const SizedBox(height: 8),
           SizedBox(
@@ -343,9 +435,11 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
               },
             ),
           ),
+        ],
           const SizedBox(height: 12),
 
           // 账户选择
+          if (!_isSmartMode)
           Row(
             children: [
               Text('账户', style: Theme.of(context).textTheme.labelLarge),
@@ -368,6 +462,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
           const SizedBox(height: 12),
 
           // 备注
+          if (!_isSmartMode)
           TextField(
             decoration: const InputDecoration(
               hintText: '添加备注...',
@@ -438,6 +533,143 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                     Navigator.pop(ctx);
                   },
                 )),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SmartSuggestion extends StatelessWidget {
+  final String note;
+  final ValueChanged<String> onSelect;
+
+  const _SmartSuggestion({required this.note, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    if (note.length < 2) return const SizedBox.shrink();
+    final provider = context.read<TransactionProvider>();
+    final suggestionId = provider.suggestCategory(note);
+    if (suggestionId == null) return const SizedBox.shrink();
+    final cat = provider.getCategoryById(suggestionId);
+    if (cat == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: ActionChip(
+        avatar: CircleAvatar(
+          radius: 10,
+          backgroundColor: Color(int.parse(cat.color)),
+          child: Text(cat.name.substring(0, 1),
+              style: const TextStyle(color: Colors.white, fontSize: 9)),
+        ),
+        label: Text('推荐: ${cat.name}',
+            style: const TextStyle(fontSize: 12)),
+        onPressed: () => onSelect(suggestionId),
+      ),
+    );
+  }
+}
+
+class _NlpResultCard extends StatelessWidget {
+  final NlpResult result;
+  final VoidCallback onAmountTap;
+  final VoidCallback onDateTap;
+  final VoidCallback onCategoryTap;
+
+  const _NlpResultCard({
+    required this.result,
+    required this.onAmountTap,
+    required this.onDateTap,
+    required this.onCategoryTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final currencyFormat =
+        NumberFormat.currency(symbol: '¥', decimalDigits: 2);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      color: colorScheme.primaryContainer.withAlpha(50),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.auto_awesome, size: 14),
+                const SizedBox(width: 4),
+                Text('识别结果',
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelMedium
+                        ?.copyWith(fontWeight: FontWeight.w600)),
+                const Spacer(),
+                Text(
+                  '${(result.confidence * 100).toStringAsFixed(0)}%',
+                  style: TextStyle(
+                    color: result.confidence >= 0.6
+                        ? Colors.green
+                        : result.confidence >= 0.3
+                            ? Colors.orange
+                            : colorScheme.error,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (result.hasAmount)
+                  ActionChip(
+                    avatar: const Icon(Icons.attach_money, size: 14),
+                    label: Text(currencyFormat.format(result.amount!)),
+                    onPressed: onAmountTap,
+                  ),
+                if (result.date != null)
+                  ActionChip(
+                    avatar: const Icon(Icons.calendar_today, size: 14),
+                    label: Text(DateFormat('yyyy-MM-dd').format(result.date!)),
+                    onPressed: onDateTap,
+                  ),
+                if (result.type != null)
+                  ActionChip(
+                    avatar: Icon(
+                      result.type == 0
+                          ? Icons.trending_down
+                          : Icons.trending_up,
+                      size: 14,
+                    ),
+                    label:
+                        Text(result.type == 0 ? '支出' : '收入'),
+                    onPressed: onAmountTap,
+                  ),
+                if (result.categoryHint != null)
+                  ActionChip(
+                    avatar: const Icon(Icons.category, size: 14),
+                    label: Text(result.categoryHint!),
+                    onPressed: onCategoryTap,
+                  ),
+              ],
+            ),
+            if (result.note.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text('备注: ${result.note}',
+                  style: Theme.of(context).textTheme.labelSmall),
+            ],
+            if (result.confidence < 0.3)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('未能完全识别，请切换到手动模式补充信息',
+                    style: TextStyle(
+                        color: colorScheme.error, fontSize: 11)),
+              ),
           ],
         ),
       ),

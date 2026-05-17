@@ -10,6 +10,7 @@ import '../../providers/transaction_provider.dart';
 import '../../models/transaction.dart';
 import '../category/category_list_screen.dart';
 import '../budget/budget_screen.dart';
+import '../periodic/periodic_list_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -225,6 +226,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       builder: (_) => ChangeNotifierProvider.value(
                         value: provider,
                         child: const BudgetScreen(),
+                      ),
+                    ),
+                  ),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
+                  leading: const Icon(Icons.repeat),
+                  title: const Text('周期账单'),
+                  subtitle: const Text('管理定期自动记账'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChangeNotifierProvider.value(
+                        value: provider,
+                        child: const PeriodicListScreen(),
                       ),
                     ),
                   ),

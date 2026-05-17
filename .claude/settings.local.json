@@ -48,7 +48,9 @@
       "Bash('D:/GitHub CLI/gh.exe' ssh-key add __TRACKED_VAR__/.ssh/id_ed25519.pub --title bookkeeping-windows)",
       "Bash(ssh *)",
       "Bash('D:/GitHub CLI/gh.exe' issue create --title 'V1.0 MVP 基础记账 — 初始提交' --body ' *)",
-      "Bash('D:/GitHub CLI/gh.exe' issue create --title 代码审查修复：类型安全与边界处理 --body ' *)"
+      "Bash('D:/GitHub CLI/gh.exe' issue create --title 代码审查修复：类型安全与边界处理 --body ' *)",
+      "Bash(git remote *)",
+      "Bash('D:/GitHub CLI/gh.exe' issue create --title 'V1.1 \"管钱\": P1 全部5项功能实现' --body ' *)"
     ]
   }
 }

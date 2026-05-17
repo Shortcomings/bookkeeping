@@ -6,6 +6,7 @@ import '../models/transaction.dart';
 import '../models/category.dart';
 import '../models/account.dart';
 import '../models/budget.dart';
+import '../models/periodic_transaction.dart';
 
 class TransactionProvider extends ChangeNotifier {
   final DatabaseHelper _db = DatabaseHelper();
@@ -34,6 +35,8 @@ class TransactionProvider extends ChangeNotifier {
     notifyListeners();
     await Future.wait([loadCategories(), loadAccounts()]);
     await loadTransactions();
+    await loadPeriodicTransactions();
+    checkAndGeneratePeriodicTransactions(); // fire-and-forget
     _loading = false;
     notifyListeners();
   }
@@ -81,6 +84,7 @@ class TransactionProvider extends ChangeNotifier {
     }
 
     _transactions.insert(0, tx);
+    learnCategoryFromNote(note, categoryId);
     notifyListeners();
   }
 
@@ -111,6 +115,7 @@ class TransactionProvider extends ChangeNotifier {
     if (index != -1) {
       _transactions[index] = tx;
     }
+    learnCategoryFromNote(tx.note, tx.categoryId);
     notifyListeners();
   }
 
@@ -673,6 +678,288 @@ class TransactionProvider extends ChangeNotifier {
       return true;
     }).toList();
   }
+}
+
+  // ==================== 周期记账 ====================
+
+  List<PeriodicTransaction> _periodicTransactions = [];
+  List<PeriodicTransaction> get periodicTransactions =>
+      _periodicTransactions;
+
+  Future<void> loadPeriodicTransactions() async {
+    final db = await _db.database;
+    final maps = await db.query('periodic_transactions',
+        orderBy: 'created_at DESC');
+    _periodicTransactions =
+        maps.map((m) => PeriodicTransaction.fromMap(m)).toList();
+    notifyListeners();
+  }
+
+  Future<void> addPeriodicTransaction({
+    required int type,
+    required int amount,
+    required String categoryId,
+    String? accountId,
+    String? note,
+    required int frequency,
+    int? customDays,
+    bool isWorkdayOnly = false,
+    bool autoConfirm = true,
+  }) async {
+    final now = DateTime.now().toIso8601String();
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final nextDate = _computeNextDateFrom(
+        frequency, today, customDays, isWorkdayOnly);
+    final pt = PeriodicTransaction(
+      id: _uuid.v4(),
+      type: type,
+      amount: amount,
+      categoryId: categoryId,
+      accountId: accountId,
+      note: note,
+      frequency: frequency,
+      customDays: customDays,
+      isWorkdayOnly: isWorkdayOnly,
+      nextDate: nextDate,
+      isActive: true,
+      autoConfirm: autoConfirm,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final db = await _db.database;
+    await db.insert('periodic_transactions', pt.toMap());
+    _periodicTransactions.insert(0, pt);
+    notifyListeners();
+  }
+
+  Future<void> updatePeriodicTransaction(
+      PeriodicTransaction pt) async {
+    final db = await _db.database;
+    await db.update(
+      'periodic_transactions',
+      pt.copyWith(updatedAt: DateTime.now().toIso8601String()).toMap(),
+      where: 'id = ?',
+      whereArgs: [pt.id],
+    );
+    final idx =
+        _periodicTransactions.indexWhere((p) => p.id == pt.id);
+    if (idx != -1) _periodicTransactions[idx] = pt;
+    notifyListeners();
+  }
+
+  Future<void> deletePeriodicTransaction(String id) async {
+    final db = await _db.database;
+    await db.delete('periodic_transactions',
+        where: 'id = ?', whereArgs: [id]);
+    _periodicTransactions.removeWhere((p) => p.id == id);
+    notifyListeners();
+  }
+
+  Future<void> togglePeriodicActive(String id, bool active) async {
+    final idx =
+        _periodicTransactions.indexWhere((p) => p.id == id);
+    if (idx == -1) return;
+    final pt = _periodicTransactions[idx];
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final updated = pt.copyWith(
+      isActive: active,
+      nextDate:
+          active ? _computeNextDateFrom(pt.frequency, today,
+              pt.customDays, pt.isWorkdayOnly) : pt.nextDate,
+    );
+    await updatePeriodicTransaction(updated);
+  }
+
+  Future<int> checkAndGeneratePeriodicTransactions() async {
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final db = await _db.database;
+    int generated = 0;
+
+    for (final pt in _periodicTransactions.where((p) => p.isActive)) {
+      String nextDate = pt.nextDate;
+      int catchUps = 0;
+      const maxCatchUp = 90;
+
+      while (nextDate.compareTo(today) <= 0 && catchUps < maxCatchUp) {
+        catchUps++;
+        // 去重检查
+        final existing = await db.rawQuery(
+          'SELECT id FROM transactions WHERE periodic_id = ? AND date = ?',
+          [pt.id, nextDate],
+        );
+        if (existing.isEmpty) {
+          await _createTransactionFromPeriodic(pt, nextDate, db);
+          generated++;
+        }
+        nextDate = _computeNextDateFrom(
+            pt.frequency, nextDate, pt.customDays, pt.isWorkdayOnly);
+      }
+
+      if (nextDate != pt.nextDate) {
+        await db.update(
+          'periodic_transactions',
+          {
+            'next_date': nextDate,
+            'updated_at': DateTime.now().toIso8601String()
+          },
+          where: 'id = ?',
+          whereArgs: [pt.id],
+        );
+        final idx =
+            _periodicTransactions.indexWhere((p) => p.id == pt.id);
+        if (idx != -1) {
+          _periodicTransactions[idx] =
+              _periodicTransactions[idx].copyWith(nextDate: nextDate);
+        }
+      }
+    }
+    if (generated > 0) {
+      await loadTransactions();
+      notifyListeners();
+    }
+    return generated;
+  }
+
+  Future<void> _createTransactionFromPeriodic(
+      PeriodicTransaction pt, String date, db) async {
+    final now = DateTime.now().toIso8601String();
+    final note = pt.autoConfirm
+        ? (pt.note ?? '')
+        : '[待确认]${pt.note ?? ""}';
+    final tx = Transaction(
+      id: _uuid.v4(),
+      type: pt.type,
+      amount: pt.amount,
+      date: date,
+      categoryId: pt.categoryId,
+      accountId: pt.accountId,
+      bookId: pt.bookId,
+      note: note.isNotEmpty ? note : null,
+      isPeriodic: true,
+      periodicId: pt.id,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await db.insert('transactions', tx.toMap());
+    if (pt.accountId != null) {
+      await db.rawUpdate(
+        'UPDATE accounts SET balance = balance + ?, updated_at = ? WHERE id = ?',
+        [
+          pt.type == 0 ? -pt.amount : pt.amount,
+          now,
+          pt.accountId
+        ],
+      );
+    }
+    _transactions.insert(0, tx);
+  }
+
+  String _computeNextDateFrom(int frequency, String fromDateStr,
+      int? customDays, bool isWorkdayOnly) {
+    DateTime d = DateTime.parse(fromDateStr);
+    switch (frequency) {
+      case 0:
+        d = d.add(const Duration(days: 1));
+        break;
+      case 1:
+        d = d.add(const Duration(days: 7));
+        break;
+      case 2:
+        d = _addMonths(d, 1);
+        break;
+      case 3:
+        d = _addMonths(d, 12);
+        break;
+      case 4:
+        d = d.add(Duration(days: customDays ?? 1));
+        break;
+    }
+    if (isWorkdayOnly) {
+      while (d.weekday == DateTime.saturday ||
+          d.weekday == DateTime.sunday) {
+        d = d.add(const Duration(days: 1));
+      }
+    }
+    return DateFormat('yyyy-MM-dd').format(d);
+  }
+
+  DateTime _addMonths(DateTime d, int months) {
+    int newMonth = d.month + months;
+    int newYear = d.year;
+    while (newMonth > 12) {
+      newMonth -= 12;
+      newYear++;
+    }
+    int maxDay = DateTime(newYear, newMonth + 1, 0).day;
+    int day = d.day > maxDay ? maxDay : d.day;
+    return DateTime(newYear, newMonth, day);
+  }
+
+  // ==================== 智能分类 ====================
+
+  final Map<String, Map<String, int>> _noteCategoryCounts = {};
+
+  static const _stopWords = {
+    '的','了','是','在','我','有','和','就','不','人','都','一','个','这',
+    '那','吗','吧','呢','啊','哦','嗯','啦','呀','哈','嘛','很','也','还',
+  };
+
+  void learnCategoryFromNote(String? note, String categoryId) {
+    if (note == null || note.isEmpty) return;
+    final keywords = _extractKeywords(note);
+    for (final kw in keywords) {
+      _noteCategoryCounts.putIfAbsent(kw, () => {});
+      _noteCategoryCounts[kw]![categoryId] =
+          (_noteCategoryCounts[kw]![categoryId] ?? 0) + 1;
+    }
+  }
+
+  String? suggestCategory(String? note) {
+    if (note == null || note.isEmpty) return null;
+    final keywords = _extractKeywords(note);
+    final aggregated = <String, int>{};
+    for (final kw in keywords) {
+      final counts = _noteCategoryCounts[kw];
+      if (counts != null) {
+        for (final entry in counts.entries) {
+          aggregated[entry.key] =
+              (aggregated[entry.key] ?? 0) + entry.value;
+        }
+      }
+    }
+    if (aggregated.isEmpty) return null;
+    final sorted = aggregated.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    if (sorted.first.value < 2) return null;
+    return sorted.first.key;
+  }
+
+  List<String> _extractKeywords(String note) {
+    final cleaned = note
+        .replaceAll(RegExp(r'[\d.,，。！？、\s]'), '')
+        .replaceAll(RegExp(r'[^一-鿿]'), '');
+    if (cleaned.isEmpty) return [];
+    final keywords = <String>{};
+    for (int i = 0; i < cleaned.length; i++) {
+      final ch = cleaned[i];
+      if (!_stopWords.contains(ch)) {
+        keywords.add(ch);
+      }
+    }
+    for (int i = 0; i < cleaned.length - 1; i++) {
+      keywords.add(cleaned.substring(i, i + 2));
+    }
+    return keywords.toList();
+  }
+
+  void _checkBudgetAlert() {
+    if (_budgets.isEmpty) return;
+    // Budget alert is triggered on HomeScreen load, no persistent notification needed
+  }
+
+  /// MonthSummary helper for comparison stats
+  static String _monthStr = '';
+
 }
 
 class MonthSummary {
