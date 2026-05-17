@@ -7,6 +7,10 @@ import '../models/category.dart';
 import '../models/account.dart';
 import '../models/budget.dart';
 import '../models/periodic_transaction.dart';
+import '../models/book.dart';
+import '../models/debt.dart';
+import '../models/debt_repayment.dart';
+import '../models/saving_goal.dart';
 
 class TransactionProvider extends ChangeNotifier {
   final DatabaseHelper _db = DatabaseHelper();
@@ -33,10 +37,10 @@ class TransactionProvider extends ChangeNotifier {
   Future<void> init() async {
     _loading = true;
     notifyListeners();
-    await Future.wait([loadCategories(), loadAccounts()]);
+    await Future.wait([loadCategories(), loadAccounts(), loadBooks(), loadDebts(), loadSavingGoals()]);
     await loadTransactions();
     await loadPeriodicTransactions();
-    checkAndGeneratePeriodicTransactions(); // fire-and-forget
+    checkAndGeneratePeriodicTransactions();
     _loading = false;
     notifyListeners();
   }
@@ -45,7 +49,10 @@ class TransactionProvider extends ChangeNotifier {
 
   Future<void> loadTransactions() async {
     final db = await _db.database;
-    final maps = await db.query('transactions', orderBy: 'date DESC');
+    final maps = await db.query('transactions',
+        where: 'book_id = ?',
+        whereArgs: [_currentBookId],
+        orderBy: 'date DESC');
     _transactions = maps.map((m) => Transaction.fromMap(m)).toList();
     notifyListeners();
   }
@@ -955,6 +962,300 @@ class TransactionProvider extends ChangeNotifier {
   void _checkBudgetAlert() {
     if (_budgets.isEmpty) return;
     // Budget alert is triggered on HomeScreen load, no persistent notification needed
+  }
+
+  // ==================== 多账本 ====================
+
+  List<Book> _books = [];
+  List<Book> get books => _books;
+  String _currentBookId = 'default';
+
+  String get currentBookId => _currentBookId;
+
+  Future<void> loadBooks() async {
+    final db = await _db.database;
+    final maps = await db.query('books');
+    _books = maps.map((m) => Book.fromMap(m)).toList();
+    if (_books.isEmpty) {
+      // Create default book if none
+      final now = DateTime.now().toIso8601String();
+      final defaultBook = Book(
+        id: 'default', name: '日常账本', icon: '0xe3cb',
+        color: '0xFF5C6BC0', createdAt: now, updatedAt: now,
+      );
+      await db.insert('books', defaultBook.toMap());
+      _books = [defaultBook];
+    }
+    notifyListeners();
+  }
+
+  Book? get currentBook {
+    try {
+      return _books.firstWhere((b) => b.id == _currentBookId);
+    } catch (_) {
+      return _books.isNotEmpty ? _books.first : null;
+    }
+  }
+
+  Future<void> switchBook(String bookId) async {
+    _currentBookId = bookId;
+    await loadTransactions();
+    await loadPeriodicTransactions();
+    notifyListeners();
+  }
+
+  Future<void> addBook({required String name, String icon = '0xe3cb',
+      String color = '0xFF5C6BC0'}) async {
+    final now = DateTime.now().toIso8601String();
+    final book = Book(id: _uuid.v4(), name: name, icon: icon,
+        color: color, createdAt: now, updatedAt: now);
+    final db = await _db.database;
+    await db.insert('books', book.toMap());
+    _books.add(book);
+    notifyListeners();
+  }
+
+  Future<void> updateBook(Book book) async {
+    final db = await _db.database;
+    await db.update('books', book.toMap(), where: 'id = ?',
+        whereArgs: [book.id]);
+    final idx = _books.indexWhere((b) => b.id == book.id);
+    if (idx != -1) _books[idx] = book;
+    notifyListeners();
+  }
+
+  Future<void> deleteBook(String id) async {
+    if (id == 'default' || _books.length <= 1) return;
+    final db = await _db.database;
+    await db.delete('books', where: 'id = ?', whereArgs: [id]);
+    await db.delete('transactions', where: 'book_id = ?',
+        whereArgs: [id]);
+    _books.removeWhere((b) => b.id == id);
+    if (_currentBookId == id) {
+      _currentBookId = _books.first.id;
+      await loadTransactions();
+    }
+    notifyListeners();
+  }
+
+  // ==================== 债务管理 ====================
+
+  List<Debt> _debts = [];
+  List<Debt> get debts => _debts;
+  List<DebtRepayment> _repayments = [];
+
+  List<DebtRepayment> getRepayments(String debtId) =>
+      _repayments.where((r) => r.debtId == debtId).toList();
+
+  Future<void> loadDebts() async {
+    final db = await _db.database;
+    final maps = await db.query('debts', orderBy: 'date DESC');
+    _debts = maps.map((m) => Debt.fromMap(m)).toList();
+    final rMaps = await db.query('debt_repayments',
+        orderBy: 'date DESC');
+    _repayments = rMaps.map((m) => DebtRepayment.fromMap(m)).toList();
+    notifyListeners();
+  }
+
+  Future<void> addDebt({required int type, required String personName,
+      required int amount, required String date,
+      String? expectedRepayDate, String? note}) async {
+    final now = DateTime.now().toIso8601String();
+    final debt = Debt(id: _uuid.v4(), type: type,
+        personName: personName, totalAmount: amount,
+        remainingAmount: amount, date: date,
+        expectedRepayDate: expectedRepayDate, note: note,
+        createdAt: now, updatedAt: now);
+    final db = await _db.database;
+    await db.insert('debts', debt.toMap());
+    _debts.insert(0, debt);
+    notifyListeners();
+  }
+
+  Future<void> updateDebt(Debt debt) async {
+    final db = await _db.database;
+    await db.update('debts', debt.toMap(), where: 'id = ?',
+        whereArgs: [debt.id]);
+    final idx = _debts.indexWhere((d) => d.id == debt.id);
+    if (idx != -1) _debts[idx] = debt;
+    notifyListeners();
+  }
+
+  Future<void> deleteDebt(String id) async {
+    final db = await _db.database;
+    await db.delete('debts', where: 'id = ?', whereArgs: [id]);
+    await db.delete('debt_repayments', where: 'debt_id = ?',
+        whereArgs: [id]);
+    _debts.removeWhere((d) => d.id == id);
+    _repayments.removeWhere((r) => r.debtId == id);
+    notifyListeners();
+  }
+
+  Future<void> addDebtRepayment({required String debtId,
+      required int amount, required String date,
+      String? note}) async {
+    final now = DateTime.now().toIso8601String();
+    final repayment = DebtRepayment(id: _uuid.v4(),
+        debtId: debtId, amount: amount, date: date, note: note,
+        createdAt: now);
+    final db = await _db.database;
+    await db.insert('debt_repayments', repayment.toMap());
+    _repayments.add(repayment);
+    // Update remaining amount
+    final dIdx = _debts.indexWhere((d) => d.id == debtId);
+    if (dIdx != -1) {
+      final debt = _debts[dIdx];
+      final newRemaining =
+          (debt.remainingAmount - amount).clamp(0, debt.totalAmount);
+      final updated = debt.copyWith(
+        remainingAmount: newRemaining,
+        isSettled: newRemaining == 0,
+        updatedAt: now,
+      );
+      await db.update('debts', updated.toMap(),
+          where: 'id = ?', whereArgs: [debtId]);
+      _debts[dIdx] = updated;
+    }
+    notifyListeners();
+  }
+
+  // ==================== 退���与报销 ====================
+
+  Future<void> refundTransaction(String txId, double amount) async {
+    final idx = _transactions.indexWhere((t) => t.id == txId);
+    if (idx == -1) return;
+    final tx = _transactions[idx];
+    final refundAmount = (amount * 100).round();
+    final now = DateTime.now().toIso8601String();
+    // Create refund record (income)
+    final refundTx = Transaction(
+      id: _uuid.v4(), type: 1, amount: refundAmount,
+      date: DateFormat('yyyy-MM-dd').format(DateTime.now()),
+      categoryId: tx.categoryId, accountId: tx.accountId,
+      bookId: tx.bookId, note: '退款: ${tx.note ?? ""}',
+      isRefund: true, refundTransactionId: txId,
+      createdAt: now, updatedAt: now,
+    );
+    final db = await _db.database;
+    await db.insert('transactions', refundTx.toMap());
+    // Mark original
+    final updated = tx.copyWith(isRefund: true,
+        refundTransactionId: refundTx.id);
+    await db.update('transactions', updated.toMap(),
+        where: 'id = ?', whereArgs: [txId]);
+    _transactions[idx] = updated;
+    _transactions.insert(0, refundTx);
+    notifyListeners();
+  }
+
+  Future<void> markReimbursable(String txId) async {
+    final idx = _transactions.indexWhere((t) => t.id == txId);
+    if (idx == -1) return;
+    final updated = _transactions[idx].copyWith(
+        isReimbursed: true, reimbursementStatus: 1);
+    final db = await _db.database;
+    await db.update('transactions', updated.toMap(),
+        where: 'id = ?', whereArgs: [txId]);
+    _transactions[idx] = updated;
+    notifyListeners();
+  }
+
+  Future<void> updateReimbursementStatus(
+      String txId, int status) async {
+    final idx = _transactions.indexWhere((t) => t.id == txId);
+    if (idx == -1) return;
+    final updated = _transactions[idx].copyWith(
+        reimbursementStatus: status);
+    final db = await _db.database;
+    await db.update('transactions', updated.toMap(),
+        where: 'id = ?', whereArgs: [txId]);
+    _transactions[idx] = updated;
+    notifyListeners();
+  }
+
+  Future<void> completeReimbursement(String txId) async {
+    final idx = _transactions.indexWhere((t) => t.id == txId);
+    if (idx == -1) return;
+    final tx = _transactions[idx];
+    final now = DateTime.now().toIso8601String();
+    final incomeTx = Transaction(
+      id: _uuid.v4(), type: 1, amount: tx.amount,
+      date: DateFormat('yyyy-MM-dd').format(DateTime.now()),
+      categoryId: tx.categoryId, accountId: tx.accountId,
+      bookId: tx.bookId, note: '报销: ${tx.note ?? ""}',
+      createdAt: now, updatedAt: now,
+    );
+    final db = await _db.database;
+    await db.insert('transactions', incomeTx.toMap());
+    final updated = tx.copyWith(reimbursementStatus: 3);
+    await db.update('transactions', updated.toMap(),
+        where: 'id = ?', whereArgs: [txId]);
+    _transactions[idx] = updated;
+    _transactions.insert(0, incomeTx);
+    notifyListeners();
+  }
+
+  List<Transaction> get reimbursableTransactions =>
+      _transactions.where((t) => t.isReimbursed).toList();
+
+  // ==================== 存钱计划 ====================
+
+  List<SavingGoal> _savingGoals = [];
+  List<SavingGoal> get savingGoals => _savingGoals;
+
+  Future<void> loadSavingGoals() async {
+    final db = await _db.database;
+    final maps = await db.query('saving_goals',
+        orderBy: 'created_at DESC');
+    _savingGoals = maps.map((m) => SavingGoal.fromMap(m)).toList();
+    notifyListeners();
+  }
+
+  Future<void> addSavingGoal({required String name,
+      required int targetAmount, String? deadline,
+      String? coverImage}) async {
+    final now = DateTime.now().toIso8601String();
+    final goal = SavingGoal(id: _uuid.v4(), name: name,
+        targetAmount: targetAmount, deadline: deadline,
+        coverImage: coverImage, createdAt: now, updatedAt: now);
+    final db = await _db.database;
+    await db.insert('saving_goals', goal.toMap());
+    _savingGoals.insert(0, goal);
+    notifyListeners();
+  }
+
+  Future<void> updateSavingGoal(SavingGoal goal) async {
+    final db = await _db.database;
+    await db.update('saving_goals', goal.toMap(),
+        where: 'id = ?', whereArgs: [goal.id]);
+    final idx = _savingGoals.indexWhere((g) => g.id == goal.id);
+    if (idx != -1) _savingGoals[idx] = goal;
+    notifyListeners();
+  }
+
+  Future<void> deleteSavingGoal(String id) async {
+    final db = await _db.database;
+    await db.delete('saving_goals', where: 'id = ?',
+        whereArgs: [id]);
+    _savingGoals.removeWhere((g) => g.id == id);
+    notifyListeners();
+  }
+
+  Future<void> addSavingAmount(String goalId, int amount) async {
+    final idx = _savingGoals.indexWhere((g) => g.id == goalId);
+    if (idx == -1) return;
+    final goal = _savingGoals[idx];
+    final newAmount = goal.currentAmount + amount;
+    final updated = goal.copyWith(
+      currentAmount: newAmount,
+      isCompleted: newAmount >= goal.targetAmount,
+      updatedAt: DateTime.now().toIso8601String(),
+    );
+    final db = await _db.database;
+    await db.update('saving_goals', updated.toMap(),
+        where: 'id = ?', whereArgs: [goalId]);
+    _savingGoals[idx] = updated;
+    notifyListeners();
   }
 
   /// MonthSummary helper for comparison stats

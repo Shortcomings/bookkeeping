@@ -75,6 +75,7 @@ class TransactionListScreen extends StatelessWidget {
                         child: _TransactionCard(
                           transaction: tx,
                           onTap: () => _showEditSheet(context, tx.id),
+                          onLongPress: () => _showActionSheet(context, tx.id, tx.type == 0),
                         ),
                       ),
                     ],
@@ -124,6 +125,76 @@ class TransactionListScreen extends StatelessWidget {
     );
   }
 
+  void _showActionSheet(BuildContext context, String txId, bool isExpense) {
+    final provider = context.read<TransactionProvider>();
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            if (isExpense) ...[
+              ListTile(
+                leading: const Icon(Icons.money_off),
+                title: const Text('退款'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showRefundDialog(context, txId);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.receipt_long),
+                title: const Text('标记为报销'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  provider.markReimbursable(txId);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('已标记为待报销')));
+                },
+              ),
+            ],
+            ListTile(
+              leading: Icon(Icons.delete, color: Theme.of(context).colorScheme.error),
+              title: Text('删除', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showDeleteDialog(context, txId);
+              },
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  void _showRefundDialog(BuildContext context, String txId) {
+    final provider = context.read<TransactionProvider>();
+    final tx = provider.transactions.firstWhere((t) => t.id == txId);
+    final amountCtrl = TextEditingController(text: (tx.amount / 100).toStringAsFixed(2));
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('退款'),
+        content: TextField(
+          controller: amountCtrl,
+          decoration: const InputDecoration(prefixText: '¥ ', labelText: '退款金额'),
+          keyboardType: TextInputType.number,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          FilledButton(onPressed: () {
+            final a = double.tryParse(amountCtrl.text);
+            if (a != null && a > 0) {
+              provider.refundTransaction(txId, a);
+              Navigator.pop(ctx);
+            }
+          }, child: const Text('确认退款')),
+        ],
+      ),
+    );
+  }
+
   void _showEditSheet(BuildContext context, String txId) {
     final provider = context.read<TransactionProvider>();
     showModalBottomSheet(
@@ -144,8 +215,9 @@ class TransactionListScreen extends StatelessWidget {
 class _TransactionCard extends StatelessWidget {
   final Transaction transaction;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
-  const _TransactionCard({required this.transaction, required this.onTap});
+  const _TransactionCard({required this.transaction, required this.onTap, this.onLongPress});
 
   @override
   Widget build(BuildContext context) {
@@ -160,6 +232,7 @@ class _TransactionCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 4),
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

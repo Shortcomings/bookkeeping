@@ -36,7 +36,8 @@ class HomeScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('${now.month}月概览'),
+        title: Text(
+            '${provider.currentBook?.name ?? "记账"} · ${now.month}月'),
         actions: [
           IconButton(
             icon: const Icon(Icons.search),

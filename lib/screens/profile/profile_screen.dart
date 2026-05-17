@@ -11,6 +11,11 @@ import '../../models/transaction.dart';
 import '../category/category_list_screen.dart';
 import '../budget/budget_screen.dart';
 import '../periodic/periodic_list_screen.dart';
+import '../book/book_list_screen.dart';
+import '../credit/credit_card_screen.dart';
+import '../debt/debt_list_screen.dart';
+import '../reimbursement/reimbursement_list_screen.dart';
+import '../saving/saving_list_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -261,6 +266,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                   ),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
+                  leading: const Icon(Icons.credit_card),
+                  title: const Text('信用卡管理'),
+                  subtitle: const Text('查看额度、账单日和还款日'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => ChangeNotifierProvider.value(value: provider, child: const CreditCardScreen()),
+                  )),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
+                  leading: const Icon(Icons.handshake),
+                  title: const Text('债务管理'),
+                  subtitle: const Text('记录借入借出、还款跟踪'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => ChangeNotifierProvider.value(value: provider, child: const DebtListScreen()),
+                  )),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
+                  leading: const Icon(Icons.receipt_long),
+                  title: const Text('报销管理'),
+                  subtitle: const Text('管理待报销记录和状态'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => ChangeNotifierProvider.value(value: provider, child: const ReimbursementListScreen()),
+                  )),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
+                  leading: const Icon(Icons.savings),
+                  title: const Text('存钱计划'),
+                  subtitle: const Text('设定攒钱目标、追踪进度'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => ChangeNotifierProvider.value(value: provider, child: const SavingListScreen()),
+                  )),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
+                  leading: const Icon(Icons.book),
+                  title: const Text('账本管理'),
+                  subtitle: const Text('创建和切换不同场景的账本'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => ChangeNotifierProvider.value(value: provider, child: const BookListScreen()),
+                  )),
                 ),
                 const Divider(height: 1, indent: 56),
                 ListTile(
