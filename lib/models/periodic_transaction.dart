@@ -64,8 +64,8 @@ class PeriodicTransaction {
         customDays: map['custom_days'] as int?,
         isWorkdayOnly: (map['is_workday_only'] as int?) == 1,
         nextDate: map['next_date'] as String,
-        isActive: (map['is_active'] as int?) != 0,
-        autoConfirm: (map['auto_confirm'] as int?) != 0,
+        isActive: (map['is_active'] as int?) == 1,
+        autoConfirm: (map['auto_confirm'] as int?) == 1,
         createdAt: map['created_at'] as String,
         updatedAt: map['updated_at'] as String,
       );

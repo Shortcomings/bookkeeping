@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/transaction_provider.dart';
+import '../../models/transaction.dart';
 
 class ReimbursementListScreen extends StatelessWidget {
   const ReimbursementListScreen({super.key});
@@ -47,7 +48,7 @@ class ReimbursementListScreen extends StatelessWidget {
 }
 
 class _ReimbursementList extends StatelessWidget {
-  final List<dynamic> txs;
+  final List<Transaction> txs;
   final NumberFormat currencyFormat;
   final bool showComplete;
   const _ReimbursementList({required this.txs, required this.currencyFormat, this.showComplete = false});

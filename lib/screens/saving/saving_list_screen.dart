@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/transaction_provider.dart';
+import '../../models/saving_goal.dart';
 import 'saving_edit_screen.dart';
 
 class SavingListScreen extends StatelessWidget {
@@ -46,13 +47,13 @@ class SavingListScreen extends StatelessWidget {
 }
 
 class _GoalCard extends StatelessWidget {
-  final dynamic goal;
+  final SavingGoal goal;
   final NumberFormat currencyFormat;
   const _GoalCard({required this.goal, required this.currencyFormat});
 
   @override
   Widget build(BuildContext context) {
-    final pct = goal.progress as double;
+    final pct = goal.progress;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: InkWell(

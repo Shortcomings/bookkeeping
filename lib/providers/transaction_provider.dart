@@ -707,6 +707,7 @@ class TransactionProvider extends ChangeNotifier {
     required int amount,
     required String categoryId,
     String? accountId,
+    String? bookId,
     String? note,
     required int frequency,
     int? customDays,
@@ -723,6 +724,7 @@ class TransactionProvider extends ChangeNotifier {
       amount: amount,
       categoryId: categoryId,
       accountId: accountId,
+      bookId: bookId ?? _currentBookId,
       note: note,
       frequency: frequency,
       customDays: customDays,
@@ -828,7 +830,7 @@ class TransactionProvider extends ChangeNotifier {
   }
 
   Future<void> _createTransactionFromPeriodic(
-      PeriodicTransaction pt, String date, db) async {
+      PeriodicTransaction pt, String date, Database db) async {
     final now = DateTime.now().toIso8601String();
     final note = pt.autoConfirm
         ? (pt.note ?? '')
@@ -1121,15 +1123,14 @@ class TransactionProvider extends ChangeNotifier {
 
   // ==================== 退���与报销 ====================
 
-  Future<void> refundTransaction(String txId, double amount) async {
+  Future<void> refundTransaction(String txId, int amountCents) async {
     final idx = _transactions.indexWhere((t) => t.id == txId);
     if (idx == -1) return;
     final tx = _transactions[idx];
-    final refundAmount = (amount * 100).round();
     final now = DateTime.now().toIso8601String();
     // Create refund record (income)
     final refundTx = Transaction(
-      id: _uuid.v4(), type: 1, amount: refundAmount,
+      id: _uuid.v4(), type: 1, amount: amountCents,
       date: DateFormat('yyyy-MM-dd').format(DateTime.now()),
       categoryId: tx.categoryId, accountId: tx.accountId,
       bookId: tx.bookId, note: '退款: ${tx.note ?? ""}',
@@ -1138,6 +1139,9 @@ class TransactionProvider extends ChangeNotifier {
     );
     final db = await _db.database;
     await db.insert('transactions', refundTx.toMap());
+    if (tx.accountId != null) {
+      await _updateAccountBalance(db, tx.accountId!, amountCents);
+    }
     // Mark original
     final updated = tx.copyWith(isRefund: true,
         refundTransactionId: refundTx.id);
@@ -1187,6 +1191,9 @@ class TransactionProvider extends ChangeNotifier {
     );
     final db = await _db.database;
     await db.insert('transactions', incomeTx.toMap());
+    if (tx.accountId != null) {
+      await _updateAccountBalance(db, tx.accountId!, tx.amount);
+    }
     final updated = tx.copyWith(reimbursementStatus: 3);
     await db.update('transactions', updated.toMap(),
         where: 'id = ?', whereArgs: [txId]);
@@ -1257,9 +1264,6 @@ class TransactionProvider extends ChangeNotifier {
     _savingGoals[idx] = updated;
     notifyListeners();
   }
-
-  /// MonthSummary helper for comparison stats
-  static String _monthStr = '';
 
 }
 

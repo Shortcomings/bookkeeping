@@ -28,7 +28,11 @@ class _SavingEditScreenState extends State<SavingEditScreen> {
 
   Future<void> _save() async {
     final amount = double.tryParse(_amount);
-    if (amount == null || amount <= 0 || _name.trim().isEmpty) return;
+    if (amount == null || amount <= 0 || _name.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请填写完整信息')));
+      return;
+    }
     setState(() => _saving = true);
     final provider = context.read<TransactionProvider>();
     try {

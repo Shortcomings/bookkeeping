@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/transaction_provider.dart';
+import '../../models/debt.dart';
 import 'debt_edit_screen.dart';
 import 'debt_repayment_screen.dart';
 
@@ -47,7 +48,7 @@ class DebtListScreen extends StatelessWidget {
 }
 
 class _DebtCard extends StatelessWidget {
-  final dynamic debt;
+  final Debt debt;
   final NumberFormat currencyFormat;
   const _DebtCard({required this.debt, required this.currencyFormat});
 

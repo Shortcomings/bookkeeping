@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/transaction_provider.dart';
+import '../../models/book.dart';
 import 'book_edit_screen.dart';
 
 class BookListScreen extends StatelessWidget {
@@ -66,7 +67,7 @@ class BookListScreen extends StatelessWidget {
     );
   }
 
-  void _confirmDelete(BuildContext context, dynamic b) {
+  void _confirmDelete(BuildContext context, Book b) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(

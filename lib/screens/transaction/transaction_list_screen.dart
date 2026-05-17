@@ -186,7 +186,7 @@ class TransactionListScreen extends StatelessWidget {
           FilledButton(onPressed: () {
             final a = double.tryParse(amountCtrl.text);
             if (a != null && a > 0) {
-              provider.refundTransaction(txId, a);
+              provider.refundTransaction(txId, (a * 100).round());
               Navigator.pop(ctx);
             }
           }, child: const Text('确认退款')),

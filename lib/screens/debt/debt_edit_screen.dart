@@ -47,10 +47,16 @@ class _DebtEditScreenState extends State<DebtEditScreen> {
     final provider = context.read<TransactionProvider>();
     try {
       if (_isEditing) {
+        final newTotal = (amount * 100).round();
+        final oldRemaining = widget.debt!.remainingAmount;
+        final oldTotal = widget.debt!.totalAmount;
+        final newRemaining = newTotal == oldTotal
+            ? oldRemaining
+            : (oldRemaining / oldTotal * newTotal).round();
         await provider.updateDebt(widget.debt!.copyWith(
           type: _type, personName: _personName.trim(),
-          totalAmount: (amount * 100).round(),
-          remainingAmount: (amount * 100).round(),
+          totalAmount: newTotal,
+          remainingAmount: newRemaining,
           date: _date,
           expectedRepayDate: _expectedRepayDate.isEmpty ? null : _expectedRepayDate,
           note: _note.isEmpty ? null : _note,

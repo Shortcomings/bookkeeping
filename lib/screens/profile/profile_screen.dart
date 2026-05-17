@@ -128,7 +128,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final dir = await getApplicationDocumentsDirectory();
     final file = File(
         '${dir.path}/记账导出_${startDate}_${endDate}.xlsx');
-    await file.writeAsBytes(excel.encode()!);
+    final encoded = excel.encode();
+    if (encoded != null) {
+      await file.writeAsBytes(encoded);
+    } else if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Excel 编码失败')));
+      return;
+    }
 
     if (context.mounted) {
       await SharePlus.instance.share(
