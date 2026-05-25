@@ -37,6 +37,7 @@ class SavingListScreen extends StatelessWidget {
               ],
             ]),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'saving_fab',
         onPressed: () => Navigator.push(context, MaterialPageRoute(
           builder: (_) => ChangeNotifierProvider.value(value: provider, child: const SavingEditScreen()),
         )),

@@ -35,13 +35,13 @@ class CreditCardScreen extends StatelessWidget {
                 // Calculate days until bill/due date
                 int? daysToBill, daysToDue;
                 if (card.billDate != null) {
-                  var billDay = DateTime(today.year, today.month, card.billDate!);
-                  if (billDay.isBefore(today)) billDay = DateTime(today.year, today.month + 1, card.billDate!);
+                  var billDay = _safeDate(today.year, today.month, card.billDate!);
+                  if (billDay.isBefore(today)) billDay = _safeDate(today.year, today.month + 1, card.billDate!);
                   daysToBill = billDay.difference(today).inDays;
                 }
                 if (card.dueDate != null) {
-                  var dueDay = DateTime(today.year, today.month, card.dueDate!);
-                  if (dueDay.isBefore(today)) dueDay = DateTime(today.year, today.month + 1, card.dueDate!);
+                  var dueDay = _safeDate(today.year, today.month, card.dueDate!);
+                  if (dueDay.isBefore(today)) dueDay = _safeDate(today.year, today.month + 1, card.dueDate!);
                   daysToDue = dueDay.difference(today).inDays;
                 }
                 // Interest-free days
@@ -113,4 +113,9 @@ class _InfoChip extends StatelessWidget {
       ]),
     );
   }
+}
+
+DateTime _safeDate(int year, int month, int day) {
+  final lastDay = DateTime(year, month + 1, 0).day;
+  return DateTime(year, month, day.clamp(1, lastDay));
 }

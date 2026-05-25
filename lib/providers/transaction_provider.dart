@@ -12,6 +12,8 @@ import '../models/book.dart';
 import '../models/debt.dart';
 import '../models/debt_repayment.dart';
 import '../models/saving_goal.dart';
+import '../models/investment.dart';
+import '../models/investment_trade.dart';
 
 class TransactionProvider extends ChangeNotifier {
   final DatabaseHelper _db = DatabaseHelper();
@@ -38,7 +40,7 @@ class TransactionProvider extends ChangeNotifier {
   Future<void> init() async {
     _loading = true;
     notifyListeners();
-    await Future.wait([loadCategories(), loadAccounts(), loadBooks(), loadDebts(), loadSavingGoals()]);
+    await Future.wait([loadCategories(), loadAccounts(), loadBooks(), loadDebts(), loadSavingGoals(), loadInvestments()]);
     await loadTransactions();
     await loadPeriodicTransactions();
     checkAndGeneratePeriodicTransactions();
@@ -223,8 +225,8 @@ class TransactionProvider extends ChangeNotifier {
 
     final db = await _db.database;
     await db.delete('categories', where: 'id = ?', whereArgs: [id]);
+    await db.delete('categories', where: 'parent_id = ?', whereArgs: [id]);
     _categories.removeWhere((c) => c.id == id);
-    // 同时删除子分类
     _categories.removeWhere((c) => c.parentId == id);
     notifyListeners();
   }
@@ -609,6 +611,26 @@ class TransactionProvider extends ChangeNotifier {
         month: '${d.month}月',
         expense: expense,
         income: income,
+      ));
+    }
+    return result;
+  }
+
+  List<CashFlowMonth> getMonthlyCashFlow() {
+    final now = DateTime.now();
+    final result = <CashFlowMonth>[];
+    for (int i = 11; i >= 0; i--) {
+      final d = DateTime(now.year, now.month - i, 1);
+      final month = DateFormat('yyyy-MM').format(d);
+      final txs = getTransactionsByMonthString(month);
+      final expense = txs.where((t) => t.type == 0).fold<int>(0, (s, t) => s + t.amount);
+      final income = txs.where((t) => t.type == 1).fold<int>(0, (s, t) => s + t.amount);
+      // Calculate net worth at end of month (accounts balance at that point)
+      // For simplicity, use current net worth minus cumulative cash flow changes
+      result.add(CashFlowMonth(
+        month: '$month-01',
+        income: income,
+        expense: expense,
       ));
     }
     return result;
@@ -1265,6 +1287,189 @@ class TransactionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ==================== 投资记录 ====================
+
+  List<Investment> _investments = [];
+  List<InvestmentTrade> _trades = [];
+
+  List<Investment> get investments => _investments;
+  List<InvestmentTrade> getTrades(String investmentId) =>
+      _trades.where((t) => t.investmentId == investmentId).toList();
+
+  Future<void> loadInvestments() async {
+    final db = await _db.database;
+    final maps = await db.query('investments', orderBy: 'created_at DESC');
+    _investments = maps.map((m) => Investment.fromMap(m)).toList();
+    final tMaps = await db.query('investment_trades', orderBy: 'date DESC');
+    _trades = tMaps.map((m) => InvestmentTrade.fromMap(m)).toList();
+    notifyListeners();
+  }
+
+  Future<void> addInvestment({
+    required String accountId,
+    required String name,
+    String? code,
+    required int type,
+    required int shares,
+    required int costBasis,
+    required int currentValue,
+    String? note,
+  }) async {
+    final now = DateTime.now().toIso8601String();
+    final inv = Investment(
+      id: _uuid.v4(),
+      accountId: accountId,
+      name: name,
+      code: code,
+      type: type,
+      shares: shares,
+      costBasis: costBasis,
+      currentValue: currentValue,
+      note: note,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final db = await _db.database;
+    await db.insert('investments', inv.toMap());
+    _investments.insert(0, inv);
+    notifyListeners();
+  }
+
+  Future<void> updateInvestment(Investment inv) async {
+    final db = await _db.database;
+    await db.update('investments', inv.toMap(), where: 'id = ?', whereArgs: [inv.id]);
+    final idx = _investments.indexWhere((i) => i.id == inv.id);
+    if (idx != -1) _investments[idx] = inv;
+    notifyListeners();
+  }
+
+  Future<void> deleteInvestment(String id) async {
+    final db = await _db.database;
+    await db.delete('investment_trades', where: 'investment_id = ?', whereArgs: [id]);
+    await db.delete('investments', where: 'id = ?', whereArgs: [id]);
+    _investments.removeWhere((i) => i.id == id);
+    _trades.removeWhere((t) => t.investmentId == id);
+    notifyListeners();
+  }
+
+  Future<void> addTrade({
+    required String investmentId,
+    required int type,
+    required int shares,
+    required int price,
+    required int amount,
+    required String date,
+    String? note,
+  }) async {
+    final now = DateTime.now().toIso8601String();
+    final trade = InvestmentTrade(
+      id: _uuid.v4(),
+      investmentId: investmentId,
+      type: type,
+      shares: shares,
+      price: price,
+      amount: amount,
+      date: date,
+      note: note,
+      createdAt: now,
+    );
+    final db = await _db.database;
+    await db.insert('investment_trades', trade.toMap());
+    _trades.insert(0, trade);
+
+    // Update holding
+    final idx = _investments.indexWhere((i) => i.id == investmentId);
+    if (idx != -1) {
+      final inv = _investments[idx];
+      int newShares = inv.shares;
+      int newCostBasis = inv.costBasis;
+      int newCurrentValue = inv.currentValue;
+
+      switch (type) {
+        case 0: // buy
+          newShares += shares;
+          newCostBasis += amount;
+          newCurrentValue += amount;
+          break;
+        case 1: // sell
+          newShares -= shares;
+          final sellRatio = newShares > 0 ? shares / inv.shares : 1.0;
+          newCostBasis -= (inv.costBasis * sellRatio).round();
+          newCurrentValue = newCostBasis;
+          break;
+        case 2: // dividend
+        case 3: // interest
+          break;
+      }
+
+      final updated = inv.copyWith(
+        shares: newShares.clamp(0, 999999999),
+        costBasis: newCostBasis.clamp(0, 999999999),
+        currentValue: newCurrentValue.clamp(0, 999999999),
+        updatedAt: now,
+      );
+      await db.update('investments', updated.toMap(), where: 'id = ?', whereArgs: [investmentId]);
+      _investments[idx] = updated;
+    }
+    notifyListeners();
+  }
+
+  Future<void> deleteTrade(String tradeId) async {
+    final tIdx = _trades.indexWhere((t) => t.id == tradeId);
+    if (tIdx == -1) return;
+    final trade = _trades[tIdx];
+    final db = await _db.database;
+    await db.delete('investment_trades', where: 'id = ?', whereArgs: [tradeId]);
+    _trades.removeAt(tIdx);
+
+    // Reverse holding update
+    final idx = _investments.indexWhere((i) => i.id == trade.investmentId);
+    if (idx != -1) {
+      final inv = _investments[idx];
+      int newShares = inv.shares;
+      int newCostBasis = inv.costBasis;
+
+      switch (trade.type) {
+        case 0: // reverse buy
+          newShares -= trade.shares;
+          newCostBasis -= trade.amount;
+          break;
+        case 1: // reverse sell
+          newShares += trade.shares;
+          newCostBasis += trade.amount;
+          break;
+        default:
+          break;
+      }
+
+      final updated = inv.copyWith(
+        shares: newShares.clamp(0, 999999999),
+        costBasis: newCostBasis.clamp(0, 999999999),
+        updatedAt: DateTime.now().toIso8601String(),
+      );
+      await db.update('investments', updated.toMap(), where: 'id = ?', whereArgs: [trade.investmentId]);
+      _investments[idx] = updated;
+    }
+    notifyListeners();
+  }
+
+  int get totalInvestmentValue =>
+      _investments.fold(0, (sum, i) => sum + i.currentValue);
+
+  int get totalInvestmentCost =>
+      _investments.fold(0, (sum, i) => sum + i.costBasis);
+
+  int get totalInvestmentProfitLoss =>
+      totalInvestmentValue - totalInvestmentCost;
+
+}
+
+class CashFlowMonth {
+  final String month;
+  final int income;
+  final int expense;
+  const CashFlowMonth({required this.month, required this.income, required this.expense});
+  int get net => income - expense;
 }
 
 class MonthSummary {

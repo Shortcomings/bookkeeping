@@ -171,6 +171,7 @@ class TransactionListScreen extends StatelessWidget {
   void _showRefundDialog(BuildContext context, String txId) {
     final provider = context.read<TransactionProvider>();
     final tx = provider.transactions.firstWhere((t) => t.id == txId);
+
     final amountCtrl = TextEditingController(text: (tx.amount / 100).toStringAsFixed(2));
     showDialog(
       context: context,

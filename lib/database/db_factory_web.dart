@@ -2,5 +2,10 @@ import 'package:sqflite_common/sqflite.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 void initDatabaseFactory() {
-  databaseFactory = databaseFactoryFfiWeb;
+  databaseFactory = createDatabaseFactoryFfiWeb(
+    noWebWorker: true,
+    options: SqfliteFfiWebOptions(
+      sqlite3WasmUri: Uri.parse('sqlite3.wasm'),
+    ),
+  );
 }

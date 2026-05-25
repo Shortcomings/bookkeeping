@@ -22,9 +22,46 @@ class DatabaseHelper {
     final path = join(dbPath, 'bookkeeping.db');
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS investments (
+          id TEXT PRIMARY KEY,
+          account_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          code TEXT,
+          type INTEGER NOT NULL DEFAULT 0,
+          shares INTEGER NOT NULL DEFAULT 0,
+          cost_basis INTEGER NOT NULL DEFAULT 0,
+          current_value INTEGER NOT NULL DEFAULT 0,
+          currency TEXT NOT NULL DEFAULT 'CNY',
+          note TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (account_id) REFERENCES accounts(id)
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS investment_trades (
+          id TEXT PRIMARY KEY,
+          investment_id TEXT NOT NULL,
+          type INTEGER NOT NULL DEFAULT 0,
+          shares INTEGER NOT NULL DEFAULT 0,
+          price INTEGER NOT NULL DEFAULT 0,
+          amount INTEGER NOT NULL,
+          date TEXT NOT NULL,
+          note TEXT,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (investment_id) REFERENCES investments(id)
+        )
+      ''');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -168,6 +205,39 @@ class DatabaseHelper {
         auto_confirm INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE investments (
+        id TEXT PRIMARY KEY,
+        account_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        code TEXT,
+        type INTEGER NOT NULL DEFAULT 0,
+        shares INTEGER NOT NULL DEFAULT 0,
+        cost_basis INTEGER NOT NULL DEFAULT 0,
+        current_value INTEGER NOT NULL DEFAULT 0,
+        currency TEXT NOT NULL DEFAULT 'CNY',
+        note TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (account_id) REFERENCES accounts(id)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE investment_trades (
+        id TEXT PRIMARY KEY,
+        investment_id TEXT NOT NULL,
+        type INTEGER NOT NULL DEFAULT 0,
+        shares INTEGER NOT NULL DEFAULT 0,
+        price INTEGER NOT NULL DEFAULT 0,
+        amount INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        note TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (investment_id) REFERENCES investments(id)
       )
     ''');
 

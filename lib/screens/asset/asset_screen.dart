@@ -4,6 +4,10 @@ import 'package:intl/intl.dart';
 import '../../providers/transaction_provider.dart';
 import '../account/account_edit_screen.dart';
 import '../account/account_transfer_screen.dart';
+import '../credit/credit_card_screen.dart';
+import '../debt/debt_list_screen.dart';
+import '../saving/saving_list_screen.dart';
+import '../investment/investment_list_screen.dart';
 
 class AssetScreen extends StatelessWidget {
   const AssetScreen({super.key});
@@ -18,6 +22,7 @@ class AssetScreen extends StatelessWidget {
     int totalAssets = 0;
     int totalLiabilities = 0;
     for (final a in provider.allAccounts) {
+      if (a.type == 4) continue; // 投资账户不计入净资产
       if (a.type == 2) {
         totalLiabilities += a.balance < 0 ? -a.balance : 0;
       } else if (a.balance > 0) {
@@ -84,6 +89,44 @@ class AssetScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
+
+          // 快捷入口
+          Row(children: [
+            Expanded(child: _QuickEntry(
+              icon: Icons.credit_card, label: '信用卡', color: Colors.orange,
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => ChangeNotifierProvider.value(value: provider, child: const CreditCardScreen()),
+              )),
+            )),
+            const SizedBox(width: 8),
+            Expanded(child: _QuickEntry(
+              icon: Icons.handshake, label: '债务', color: Colors.red,
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => ChangeNotifierProvider.value(value: provider, child: const DebtListScreen()),
+              )),
+            )),
+            const SizedBox(width: 8),
+            Expanded(child: _QuickEntry(
+              icon: Icons.savings, label: '存钱计划', color: Colors.green,
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => ChangeNotifierProvider.value(value: provider, child: const SavingListScreen()),
+              )),
+            )),
+          ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: _QuickEntry(
+              icon: Icons.trending_up, label: '投资持仓', color: const Color(0xFF0097A7),
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => ChangeNotifierProvider.value(value: provider, child: const InvestmentListScreen()),
+              )),
+            )),
+            const SizedBox(width: 8),
+            const Expanded(child: SizedBox()),
+            const SizedBox(width: 8),
+            const Expanded(child: SizedBox()),
+          ]),
+          const SizedBox(height: 24),
 
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -170,6 +213,7 @@ class AssetScreen extends StatelessWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'asset_fab',
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(
@@ -317,6 +361,33 @@ class _StatItem extends StatelessWidget {
                 .titleMedium
                 ?.copyWith(fontWeight: FontWeight.w600, color: color)),
       ],
+    );
+  }
+}
+
+class _QuickEntry extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _QuickEntry({required this.icon, required this.label, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          child: Column(children: [
+            Icon(icon, color: color, size: 28),
+            const SizedBox(height: 6),
+            Text(label, style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w500)),
+          ]),
+        ),
+      ),
     );
   }
 }

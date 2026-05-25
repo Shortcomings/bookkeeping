@@ -41,21 +41,8 @@ class HomeScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
+            tooltip: '搜索',
             onPressed: () => onTabChange?.call(1),
-          ),
-          IconButton(
-            icon: const Icon(Icons.calendar_month_outlined),
-            onPressed: () async {
-              final date = await showDatePicker(
-                context: context,
-                initialDate: now,
-                firstDate: DateTime(2000),
-                lastDate: DateTime(2100),
-              );
-              if (date != null && context.mounted) {
-                onTabChange?.call(1);
-              }
-            },
           ),
         ],
       ),
@@ -128,6 +115,7 @@ class HomeScreen extends StatelessWidget {
               ],
             ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'home_fab',
         onPressed: () => showModalBottomSheet(
           context: context,
           isScrollControlled: true,

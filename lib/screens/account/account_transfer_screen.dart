@@ -26,9 +26,9 @@ class _AccountTransferScreenState extends State<AccountTransferScreen> {
         NumberFormat.currency(symbol: '¥', decimalDigits: 2);
 
     final fromAccount =
-        _fromId != null ? accounts.firstWhere((a) => a.id == _fromId) : null;
+        _fromId != null ? accounts.firstWhere((a) => a.id == _fromId, orElse: () => null as dynamic) : null;
     final toAccount =
-        _toId != null ? accounts.firstWhere((a) => a.id == _toId) : null;
+        _toId != null ? accounts.firstWhere((a) => a.id == _toId, orElse: () => null as dynamic) : null;
     final validAccounts = _fromId != null
         ? accounts.where((a) => a.id != _fromId).toList()
         : accounts;

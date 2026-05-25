@@ -377,7 +377,6 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
           }),
 
           // 分类选择
-          if (!_isSmartMode)
           if (!_isSmartMode) ...[
           Text('分类', style: Theme.of(context).textTheme.labelLarge),
           const SizedBox(height: 8),

@@ -157,6 +157,7 @@ class PeriodicListScreen extends StatelessWidget {
               },
             ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'periodic_fab',
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(

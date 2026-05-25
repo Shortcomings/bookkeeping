@@ -58,7 +58,7 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
       return;
     }
     final balanceInCents =
-        (double.tryParse(_balance) ?? 0 * 100).round();
+        ((double.tryParse(_balance) ?? 0) * 100).round();
 
     setState(() => _saving = true);
     final provider = context.read<TransactionProvider>();
@@ -169,7 +169,7 @@ class _AccountEditScreenState extends State<AccountEditScreen> {
                       ? (_creditLimit! / 100).toStringAsFixed(0)
                       : ''),
               onChanged: (v) =>
-                  _creditLimit = (double.tryParse(v) ?? 0 * 100).round(),
+                  _creditLimit = ((double.tryParse(v) ?? 0) * 100).round(),
             ),
             const SizedBox(height: 16),
             Row(

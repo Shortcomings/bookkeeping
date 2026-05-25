@@ -50,6 +50,7 @@ class CategoryListScreen extends StatelessWidget {
               ],
             ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'category_fab',
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(

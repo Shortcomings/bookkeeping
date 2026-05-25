@@ -58,6 +58,7 @@ class BookListScreen extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'book_fab',
         onPressed: () => Navigator.push(context, MaterialPageRoute(
           builder: (_) => ChangeNotifierProvider.value(
               value: provider, child: const BookEditScreen()),

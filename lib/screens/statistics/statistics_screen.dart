@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../providers/transaction_provider.dart';
+import '../../services/export_service.dart';
 import 'comparison_view.dart';
 
 class StatisticsScreen extends StatefulWidget {
@@ -22,7 +23,7 @@ class _StatisticsScreenState extends State<StatisticsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         setState(() {
@@ -121,7 +122,7 @@ class _StatisticsScreenState extends State<StatisticsScreen>
       colorIndex++;
     }
 
-    final tabLabels = ['本周', '本月', '本年', '对比'];
+    final tabLabels = ['本周', '本月', '本年', '对比', '高级'];
 
     return Scaffold(
       appBar: AppBar(
@@ -133,6 +134,8 @@ class _StatisticsScreenState extends State<StatisticsScreen>
       ),
       body: _selectedTab == 3
           ? const ComparisonView()
+          : _selectedTab == 4
+          ? _buildAdvancedReport(context)
           : filteredTxs.isEmpty
           ? Center(
               child: Column(
@@ -307,6 +310,189 @@ class _StatisticsScreenState extends State<StatisticsScreen>
                 ],
               ],
             ),
+    );
+  }
+
+  Widget _buildAdvancedReport(BuildContext context) {
+    final provider = context.watch<TransactionProvider>();
+    final currencyFormat = NumberFormat.currency(symbol: '¥', decimalDigits: 2);
+
+    // Balance sheet
+    final accounts = provider.allAccounts.where((a) => a.type != 4).toList();
+    int totalAssets = 0;
+    int totalLiabilities = 0;
+    for (final a in accounts) {
+      if (a.type == 2) {
+        totalLiabilities += a.balance < 0 ? -a.balance : 0;
+      } else if (a.balance > 0) {
+        totalAssets += a.balance;
+      } else {
+        totalLiabilities += -a.balance;
+      }
+    }
+    totalAssets += provider.totalInvestmentValue;
+    final netWorth = totalAssets - totalLiabilities;
+
+    // Cash flow
+    final cashFlow = provider.getMonthlyCashFlow();
+
+    // Net worth trend data
+    int runningNetWorth = netWorth;
+    final netWorthPoints = <FlSpot>[];
+    for (int i = cashFlow.length - 1; i >= 0; i--) {
+      runningNetWorth -= cashFlow[i].net;
+      netWorthPoints.insert(0, FlSpot((cashFlow.length - 1 - i).toDouble(), (runningNetWorth / 100).toDouble()));
+    }
+    netWorthPoints.add(FlSpot((cashFlow.length).toDouble(), (netWorth / 100).toDouble()));
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // 资产负债表
+        Text('资产负债表', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Card(
+          color: Theme.of(context).colorScheme.primaryContainer,
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(children: [
+              Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+                _StatItem(label: '总资产', value: currencyFormat.format(totalAssets / 100), color: Theme.of(context).colorScheme.tertiary),
+                _StatItem(label: '总负债', value: currencyFormat.format(totalLiabilities / 100), color: Theme.of(context).colorScheme.error),
+                _StatItem(label: '净资产', value: currencyFormat.format(netWorth / 100), color: netWorth >= 0 ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.error),
+              ]),
+              const SizedBox(height: 16),
+              ...accounts.map((a) {
+                final names = ['现金', '借记卡', '信用卡', '储值卡', '投资'];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    Text(names[a.type.clamp(0, 4)], style: Theme.of(context).textTheme.bodySmall),
+                    Text(currencyFormat.format(a.balance / 100), style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500)),
+                  ]),
+                );
+              }),
+              if (provider.totalInvestmentValue > 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    const Text('投资持仓', style: TextStyle(fontSize: 12)),
+                    Text(currencyFormat.format(provider.totalInvestmentValue / 100), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                  ]),
+                ),
+            ]),
+          ),
+        ),
+
+        const SizedBox(height: 24),
+
+        // 现金流表
+        Text('现金流表', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columnSpacing: 16,
+                columns: const [
+                  DataColumn(label: Text('月份', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12))),
+                  DataColumn(label: Text('收入', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12))),
+                  DataColumn(label: Text('支出', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12))),
+                  DataColumn(label: Text('净现金流', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12))),
+                ],
+                rows: cashFlow.map((cf) => DataRow(cells: [
+                  DataCell(Text(cf.month.substring(5).replaceFirst('-', '/'), style: const TextStyle(fontSize: 11))),
+                  DataCell(Text(currencyFormat.format(cf.income / 100), style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.tertiary))),
+                  DataCell(Text(currencyFormat.format(cf.expense / 100), style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.error))),
+                  DataCell(Text(currencyFormat.format(cf.net / 100), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: cf.net >= 0 ? Theme.of(context).colorScheme.tertiary : Theme.of(context).colorScheme.error))),
+                ])).toList(),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 24),
+
+        // 净资产趋势图
+        Text('净资产趋势', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: SizedBox(
+              height: 240,
+              child: LineChart(
+                LineChartData(
+                  gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: netWorth > 0 ? (netWorth / 500).round().clamp(1, 99999) * 100.0 : 100),
+                  titlesData: FlTitlesData(
+                    leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 60, getTitlesWidget: (value, meta) => Text(currencyFormat.format(value), style: const TextStyle(fontSize: 10)))),
+                    bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, getTitlesWidget: (value, meta) {
+                      final idx = value.toInt();
+                      if (idx >= 0 && idx < cashFlow.length) {
+                        return Text(cashFlow[idx].month.substring(5, 7), style: const TextStyle(fontSize: 9));
+                      }
+                      return const Text('');
+                    })),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: netWorthPoints,
+                      isCurved: true,
+                      color: Theme.of(context).colorScheme.primary,
+                      barWidth: 2,
+                      dotData: const FlDotData(show: true),
+                      belowBarData: BarAreaData(show: true, color: Theme.of(context).colorScheme.primary.withAlpha(30)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 24),
+
+        // 导出按钮
+        Row(children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                try {
+                  await ExportService.exportAdvancedReport(provider);
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('导出失败: $e')));
+                  }
+                }
+              },
+              icon: const Icon(Icons.file_download, size: 18),
+              label: const Text('导出报表 CSV'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                try {
+                  await ExportService.exportToCsv(provider);
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('导出失败: $e')));
+                  }
+                }
+              },
+              icon: const Icon(Icons.table_chart, size: 18),
+              label: const Text('导出账单 CSV'),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 40),
+      ],
     );
   }
 }

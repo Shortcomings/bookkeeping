@@ -37,10 +37,10 @@ class _SearchScreenState extends State<SearchScreen> {
       endDate: _endDate,
       typeFilter: _typeFilter,
       minAmount: _minAmount.isNotEmpty
-          ? (double.tryParse(_minAmount) ?? 0 * 100).round()
+          ? ((double.tryParse(_minAmount) ?? 0) * 100).round()
           : null,
       maxAmount: _maxAmount.isNotEmpty
-          ? (double.tryParse(_maxAmount) ?? 0 * 100).round()
+          ? ((double.tryParse(_maxAmount) ?? 0) * 100).round()
           : null,
       accountId: _accountId,
       categoryId: _categoryId,

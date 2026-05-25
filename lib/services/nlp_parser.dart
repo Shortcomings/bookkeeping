@@ -63,25 +63,31 @@ class NlpParser {
     if (dateMatch1 != null) {
       final m = int.parse(dateMatch1.group(1)!);
       final d = int.parse(dateMatch1.group(2)!);
-      final now = DateTime.now();
-      int y = now.year;
-      if (DateTime(y, m, d).isAfter(now)) y--; // future → last year
-      date = DateTime(y, m, d);
-      dateStr = dateMatch1.group(0)!;
-      confidence += 0.2;
+      if (m >= 1 && m <= 12) {
+        final now = DateTime.now();
+        int y = now.year;
+        final lastDay = DateTime(y, m + 1, 0).day;
+        final safeD = d.clamp(1, lastDay);
+        if (DateTime(y, m, safeD).isAfter(now)) y--; // future → last year
+        date = DateTime(y, m, safeD);
+        dateStr = dateMatch1.group(0)!;
+        confidence += 0.2;
+      }
     }
 
     // Full date: 2024年3月5日 or 2024-03-05
     if (date == null) {
       final dateMatch2 = RegExp(r'(\d{4})[-年](\d{1,2})[-月](\d{1,2})日?').firstMatch(remaining);
       if (dateMatch2 != null) {
-        date = DateTime(
-          int.parse(dateMatch2.group(1)!),
-          int.parse(dateMatch2.group(2)!),
-          int.parse(dateMatch2.group(3)!),
-        );
-        dateStr = dateMatch2.group(0)!;
-        confidence += 0.2;
+        final m2 = int.parse(dateMatch2.group(2)!);
+        final d2 = int.parse(dateMatch2.group(3)!);
+        if (m2 >= 1 && m2 <= 12) {
+          final y2 = int.parse(dateMatch2.group(1)!);
+          final lastDay2 = DateTime(y2, m2 + 1, 0).day;
+          date = DateTime(y2, m2, d2.clamp(1, lastDay2));
+          dateStr = dateMatch2.group(0)!;
+          confidence += 0.2;
+        }
       }
     }
 
