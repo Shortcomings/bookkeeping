@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/transaction_provider.dart';
 import 'database/db_factory.dart';
+import 'services/auto_bookkeeping_service.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/transaction/transaction_list_screen.dart';
 import 'screens/statistics/statistics_screen.dart';
@@ -13,6 +14,7 @@ void main() async {
   initDatabaseFactory();
   final provider = TransactionProvider();
   await provider.init();
+  AutoBookkeepingService().initialize();
 
   runApp(
     ChangeNotifierProvider.value(

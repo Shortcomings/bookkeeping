@@ -33,6 +33,13 @@ dependencies:
   sqflite_common_ffi_web: ^1.1.1
   sqflite_common: ^2.5.7
 
+  # AI 助手
+  http: ^1.2.0
+  flutter_markdown: ^0.7.0
+
+  # 文件导入
+  file_picker: ^8.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

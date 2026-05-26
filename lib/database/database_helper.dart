@@ -22,13 +22,44 @@ class DatabaseHelper {
     final path = join(dbPath, 'bookkeeping.db');
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 3) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS ai_config (
+          id INTEGER PRIMARY KEY DEFAULT 1,
+          provider TEXT NOT NULL DEFAULT 'deepseek',
+          api_key TEXT NOT NULL DEFAULT '',
+          base_url TEXT NOT NULL DEFAULT 'https://api.deepseek.com/v1',
+          model TEXT NOT NULL DEFAULT 'deepseek-chat',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL DEFAULT '新对话',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS chat_messages (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          role TEXT NOT NULL,
+          content TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
+        )
+      ''');
+    }
     if (oldVersion < 2) {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS investments (
@@ -238,6 +269,38 @@ class DatabaseHelper {
         note TEXT,
         created_at TEXT NOT NULL,
         FOREIGN KEY (investment_id) REFERENCES investments(id)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE ai_config (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        provider TEXT NOT NULL DEFAULT 'deepseek',
+        api_key TEXT NOT NULL DEFAULT '',
+        base_url TEXT NOT NULL DEFAULT 'https://api.deepseek.com/v1',
+        model TEXT NOT NULL DEFAULT 'deepseek-chat',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE chat_sessions (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL DEFAULT '新对话',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE chat_messages (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
       )
     ''');
 

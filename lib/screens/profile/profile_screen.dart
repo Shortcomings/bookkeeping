@@ -8,6 +8,9 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import '../../providers/transaction_provider.dart';
 import '../../models/transaction.dart';
+import '../../services/auto_bookkeeping_service.dart';
+import '../../services/import_service.dart';
+import '../ai/ai_chat_screen.dart';
 import '../category/category_list_screen.dart';
 import '../budget/budget_screen.dart';
 import '../periodic/periodic_list_screen.dart';
@@ -16,6 +19,7 @@ import '../credit/credit_card_screen.dart';
 import '../debt/debt_list_screen.dart';
 import '../reimbursement/reimbursement_list_screen.dart';
 import '../saving/saving_list_screen.dart';
+import '../import/import_preview_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -174,6 +178,97 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _showImport(BuildContext context) async {
+    final result = await ImportService.pickAndParseFile();
+    if (result == null || !context.mounted) return;
+
+    if (result.headers.isEmpty || result.rows.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('文件中没有找到数据')),
+        );
+      }
+      return;
+    }
+
+    final imported = await Navigator.push<int>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChangeNotifierProvider.value(
+          value: context.read<TransactionProvider>(),
+          child: ImportPreviewScreen(
+            fileName: result.fileName,
+            headers: result.headers,
+            rows: result.rows,
+            template: result.template,
+          ),
+        ),
+      ),
+    );
+
+    if (imported != null && imported > 0 && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('成功导入 $imported 条交易记录')),
+      );
+    }
+  }
+
+  void _showAutoBookkeepingSettings(BuildContext context) async {
+    final service = AutoBookkeepingService();
+    final isEnabled = await service.isNotificationListenerEnabled();
+
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('自动记账设置'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  isEnabled ? Icons.check_circle : Icons.warning_amber_rounded,
+                  color: isEnabled ? Colors.green : Colors.orange,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  isEnabled ? '通知监听已开启' : '通知监听未开启',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isEnabled ? Colors.green : Colors.orange,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '开启后，当您使用微信或支付宝支付时，'
+              '记账App会自动识别通知内容并生成待确认的账单记录。\n\n'
+              '您的通知内容仅在本地处理，不会上传到任何服务器。',
+              style: TextStyle(fontSize: 13, height: 1.5),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('关闭'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              service.openNotificationSettings();
+            },
+            child: Text(isEnabled ? '管理权限' : '去开启'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<TransactionProvider>();
@@ -322,11 +417,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const Divider(height: 1, indent: 56),
                 ListTile(
+                  leading: const Icon(Icons.auto_awesome),
+                  title: const Text('AI 财务助手'),
+                  subtitle: const Text('智能分析收支、对比趋势、省钱建议'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => ChangeNotifierProvider.value(
+                      value: provider,
+                      child: const AIChatScreen(),
+                    ),
+                  )),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
+                  leading: const Icon(Icons.notifications_active_outlined),
+                  title: const Text('自动记账'),
+                  subtitle: const Text('从微信/支付宝通知自动识别收支'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _showAutoBookkeepingSettings(context),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
                   leading: const Icon(Icons.file_download_outlined),
                   title: const Text('导出数据'),
                   subtitle: const Text('支持 Excel / CSV 格式，可按时间范围导出'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _showExportOptions(context),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
+                  leading: const Icon(Icons.file_upload_outlined),
+                  title: const Text('导入数据'),
+                  subtitle: const Text('从微信/支付宝账单或 CSV/Excel 文件导入'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _showImport(context),
                 ),
                 const Divider(height: 1, indent: 56),
                 ListTile(

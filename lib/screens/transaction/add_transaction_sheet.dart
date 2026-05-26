@@ -8,7 +8,8 @@ import '../../services/nlp_parser.dart';
 
 class AddTransactionSheet extends StatefulWidget {
   final String? editTransactionId;
-  const AddTransactionSheet({super.key, this.editTransactionId});
+  final Map<String, dynamic>? prefillData;
+  const AddTransactionSheet({super.key, this.editTransactionId, this.prefillData});
 
   @override
   State<AddTransactionSheet> createState() => _AddTransactionSheetState();
@@ -46,6 +47,19 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
       _accountId = tx.accountId;
       _note = tx.note ?? '';
       _date = tx.date;
+    } else if (widget.prefillData != null) {
+      final prefill = widget.prefillData!;
+      _type = prefill['type'] as int? ?? 0;
+      _amount = prefill['amount'] as String? ?? '';
+      _note = prefill['note'] as String? ?? '';
+      _date = prefill['date'] as String? ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final cats = _type == 0 ? _provider.expenseCategories : _provider.incomeCategories;
+      if (cats.isNotEmpty) {
+        final match = NlpParser.matchCategoryFromText(_note);
+        final idx = cats.indexWhere((c) => c.name == match.categoryName);
+        _categoryId = idx != -1 ? cats[idx].id : cats.first.id;
+      }
+      if (_provider.accounts.isNotEmpty) _accountId = _provider.accounts.first.id;
     } else {
       final cats = _type == 0 ? _provider.expenseCategories : _provider.incomeCategories;
       if (cats.isNotEmpty) _categoryId = cats.first.id;

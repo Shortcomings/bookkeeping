@@ -3,13 +3,68 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/transaction_provider.dart';
 import '../../models/transaction.dart';
+import '../../services/auto_bookkeeping_service.dart';
 import '../transaction/add_transaction_sheet.dart';
 import '../budget/budget_screen.dart';
 import '../periodic/periodic_list_screen.dart';
+import '../import/auto_bookkeeping_review_sheet.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   final ValueChanged<int>? onTabChange;
   const HomeScreen({super.key, this.onTabChange});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _checkPendingAutoTransactions();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkPendingAutoTransactions();
+    }
+  }
+
+  Future<void> _checkPendingAutoTransactions() async {
+    final service = AutoBookkeepingService();
+    await service.loadPendingTransactions();
+    if (!mounted) return;
+    if (service.pending.isEmpty) return;
+
+    final imported = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => ChangeNotifierProvider.value(
+        value: context.read<TransactionProvider>(),
+        child: AutoBookkeepingReviewSheet(
+          pendingTransactions: service.pending,
+        ),
+      ),
+    );
+    if (imported != null && imported > 0 && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已导入 $imported 条交易记录')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +97,7 @@ class HomeScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.search),
             tooltip: '搜索',
-            onPressed: () => onTabChange?.call(1),
+            onPressed: () => widget.onTabChange?.call(1),
           ),
         ],
       ),
@@ -102,7 +157,7 @@ class HomeScreen extends StatelessWidget {
                     Text('最近记录',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
                     TextButton(
-                      onPressed: () => onTabChange?.call(1),
+                      onPressed: () => widget.onTabChange?.call(1),
                       child: const Text('查看全部')),
                   ],
                 ),

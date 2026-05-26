@@ -14,6 +14,7 @@ import '../models/debt_repayment.dart';
 import '../models/saving_goal.dart';
 import '../models/investment.dart';
 import '../models/investment_trade.dart';
+import '../services/nlp_parser.dart';
 
 class TransactionProvider extends ChangeNotifier {
   final DatabaseHelper _db = DatabaseHelper();
@@ -986,6 +987,77 @@ class TransactionProvider extends ChangeNotifier {
   void _checkBudgetAlert() {
     if (_budgets.isEmpty) return;
     // Budget alert is triggered on HomeScreen load, no persistent notification needed
+  }
+
+  // ==================== 自动记账导入 ====================
+
+  /// Import a single auto-detected transaction with category matching and dedup.
+  /// Returns true if the transaction was actually inserted.
+  Future<bool> importAutoTransaction({
+    required String merchantName,
+    required int amountCents,
+    required int type,
+    required String date,
+    String? sourceApp,
+  }) async {
+    // 1. Auto-match category
+    final match = NlpParser.matchCategoryFromText(merchantName);
+    final cats = match.type == 0 ? expenseCategories : incomeCategories;
+    final matchedCat = cats.firstWhere(
+      (c) => c.name == match.categoryName && c.isEnabled,
+      orElse: () => cats.firstWhere(
+        (c) => c.name == '其他' && c.isEnabled,
+        orElse: () => cats.first,
+      ),
+    );
+
+    // 2. Duplicate detection: same date + amount + type
+    final existing = _transactions.where(
+      (t) => t.date == date && t.amount == amountCents && t.type == type,
+    );
+    if (existing.isNotEmpty) return false;
+
+    // 3. Auto-match account (prefer WeChat/Alipay)
+    String? accountId;
+    if (sourceApp != null) {
+      final named = _accounts.where(
+        (a) => a.name.contains(sourceApp) && a.isEnabled,
+      );
+      if (named.isNotEmpty) accountId = named.first.id;
+    }
+    accountId ??= _accounts.where((a) => a.isEnabled).firstOrNull?.id;
+
+    // 4. Build note
+    final note = '$merchantName${sourceApp != null ? " (来自$sourceApp自动记账)" : ""}';
+
+    // 5. Insert using existing addTransaction flow
+    await addTransaction(
+      type: type,
+      amount: amountCents,
+      date: date,
+      categoryId: matchedCat.id,
+      accountId: accountId,
+      note: note,
+    );
+
+    return true;
+  }
+
+  /// Import multiple auto transactions. Returns count of successfully imported.
+  Future<int> importAutoTransactions(
+      List<Map<String, dynamic>> transactions) async {
+    int count = 0;
+    for (final tx in transactions) {
+      final success = await importAutoTransaction(
+        merchantName: tx['merchantName'] as String,
+        amountCents: tx['amountCents'] as int,
+        type: tx['type'] as int,
+        date: tx['date'] as String,
+        sourceApp: tx['sourceApp'] as String?,
+      );
+      if (success) count++;
+    }
+    return count;
   }
 
   // ==================== 多账本 ====================

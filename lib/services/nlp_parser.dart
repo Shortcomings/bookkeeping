@@ -38,6 +38,35 @@ class NlpParser {
     '工资', '奖金', '收入', '到账', '发薪', '报销', '兼职', '副业', '外快', '稿费', '投资', '理财', '股票', '基金', '分红', '利息', '收益', '退款', '返现', '红包', '收款', '进账',
   ];
 
+  static Map<String, List<String>> get catKeywords => _catKeywords;
+  static List<String> get incomeKeywords => _incomeKeywords;
+
+  /// Match merchant text against category keyword dictionary.
+  /// Returns best-matching category name and type (0=expense, 1=income).
+  static ({String categoryName, int type}) matchCategoryFromText(String text) {
+    // Check income keywords first
+    for (final kw in _incomeKeywords) {
+      if (text.contains(kw)) {
+        return (categoryName: '其他', type: 1);
+      }
+    }
+
+    // Match expense categories
+    int bestScore = 0;
+    String bestCategory = '其他';
+    for (final entry in _catKeywords.entries) {
+      for (final kw in entry.value) {
+        if (text.contains(kw)) {
+          if (kw.length > bestScore) {
+            bestScore = kw.length;
+            bestCategory = entry.key;
+          }
+        }
+      }
+    }
+    return (categoryName: bestCategory, type: 0);
+  }
+
   static NlpResult parse(String input) {
     if (input.trim().isEmpty) return const NlpResult();
     double confidence = 0;
