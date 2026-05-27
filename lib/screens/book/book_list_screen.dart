@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../../providers/transaction_provider.dart';
 import '../../models/book.dart';
 import 'book_edit_screen.dart';
+import 'shared_members_screen.dart';
+import 'audit_log_screen.dart';
 
 class BookListScreen extends StatelessWidget {
   const BookListScreen({super.key});
@@ -31,7 +33,20 @@ class BookListScreen extends StatelessWidget {
                 child: Text(b.name.substring(0, 1),
                     style: const TextStyle(color: Colors.white)),
               ),
-              title: Text(b.name, style: const TextStyle(fontSize: 15)),
+              title: Row(
+                children: [
+                  Expanded(child: Text(b.name, style: const TextStyle(fontSize: 15))),
+                  if (b.isShared)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text('共享', style: TextStyle(fontSize: 11, color: Colors.green.shade700)),
+                    ),
+                ],
+              ),
               subtitle: isCurrent ? const Text('当前账本', style: TextStyle(fontSize: 12)) : null,
               trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                 if (!isCurrent)
@@ -39,6 +54,28 @@ class BookListScreen extends StatelessWidget {
                     onPressed: () => provider.switchBook(b.id),
                     child: const Text('切换'),
                   ),
+                if (b.isShared) ...[
+                  IconButton(
+                    icon: const Icon(Icons.people, size: 18),
+                    tooltip: '成员管理',
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => ChangeNotifierProvider.value(
+                        value: provider,
+                        child: SharedMembersScreen(bookId: b.id, bookName: b.name),
+                      ),
+                    )),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.history, size: 18),
+                    tooltip: '操作日志',
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => ChangeNotifierProvider.value(
+                        value: provider,
+                        child: AuditLogScreen(bookId: b.id, bookName: b.name),
+                      ),
+                    )),
+                  ),
+                ],
                 IconButton(
                   icon: const Icon(Icons.edit, size: 18),
                   onPressed: () => Navigator.push(context, MaterialPageRoute(

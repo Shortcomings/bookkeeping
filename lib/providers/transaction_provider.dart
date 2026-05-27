@@ -14,7 +14,11 @@ import '../models/debt_repayment.dart';
 import '../models/saving_goal.dart';
 import '../models/investment.dart';
 import '../models/investment_trade.dart';
+import '../models/shared_member.dart';
+import '../models/shared_invitation.dart';
+import '../models/shared_audit_log.dart';
 import '../services/nlp_parser.dart';
+import '../services/invite_service.dart';
 
 class TransactionProvider extends ChangeNotifier {
   final DatabaseHelper _db = DatabaseHelper();
@@ -24,6 +28,12 @@ class TransactionProvider extends ChangeNotifier {
   List<Category> _categories = [];
   List<Account> _accounts = [];
   bool _loading = false;
+
+  // 共享账本状态
+  final Map<String, List<SharedMember>> _members = {};
+  final Map<String, List<SharedInvitation>> _invitations = {};
+  final Map<String, List<SharedAuditLog>> _auditLogs = {};
+  String _currentUserName = '';
 
   List<Transaction> get transactions => _transactions;
   List<Category> get categories =>
@@ -36,6 +46,13 @@ class TransactionProvider extends ChangeNotifier {
       _accounts.where((a) => a.isEnabled).toList();
   bool get loading => _loading;
 
+  String get currentUserName => _currentUserName;
+
+  void setCurrentUserName(String name) {
+    _currentUserName = name;
+    notifyListeners();
+  }
+
   // ==================== 初始化 ====================
 
   Future<void> init() async {
@@ -44,6 +61,7 @@ class TransactionProvider extends ChangeNotifier {
     await Future.wait([loadCategories(), loadAccounts(), loadBooks(), loadDebts(), loadSavingGoals(), loadInvestments()]);
     await loadTransactions();
     await loadPeriodicTransactions();
+    await loadMembersForBook(_currentBookId);
     checkAndGeneratePeriodicTransactions();
     _loading = false;
     notifyListeners();
@@ -72,6 +90,7 @@ class TransactionProvider extends ChangeNotifier {
     String? tags,
   }) async {
     final now = DateTime.now().toIso8601String();
+    final isShared = currentBook?.isShared == true;
     final tx = Transaction(
       id: _uuid.v4(),
       type: type,
@@ -82,6 +101,7 @@ class TransactionProvider extends ChangeNotifier {
       bookId: bookId,
       note: note,
       tags: tags,
+      createdBy: isShared && _currentUserName.isNotEmpty ? _currentUserName : null,
       createdAt: now,
       updatedAt: now,
     );
@@ -96,6 +116,12 @@ class TransactionProvider extends ChangeNotifier {
 
     _transactions.insert(0, tx);
     learnCategoryFromNote(note, categoryId);
+
+    // 共享账本审计日志
+    if (isShared && _currentUserName.isNotEmpty) {
+      await _writeAuditLog(db, bookId, 'create_transaction', 'transaction', tx.id, '记了一笔${type == 0 ? "支出" : "收入"}: ¥${(amount / 100).toStringAsFixed(2)}');
+    }
+
     notifyListeners();
   }
 
@@ -127,6 +153,11 @@ class TransactionProvider extends ChangeNotifier {
       _transactions[index] = tx;
     }
     learnCategoryFromNote(tx.note, tx.categoryId);
+
+    if (currentBook?.isShared == true && _currentUserName.isNotEmpty) {
+      await _writeAuditLog(db, tx.bookId, 'update_transaction', 'transaction', tx.id, '修改了一笔记录');
+    }
+
     notifyListeners();
   }
 
@@ -141,6 +172,11 @@ class TransactionProvider extends ChangeNotifier {
     }
 
     await db.delete('transactions', where: 'id = ?', whereArgs: [id]);
+
+    if (currentBook?.isShared == true && _currentUserName.isNotEmpty) {
+      await _writeAuditLog(db, tx.bookId, 'delete_transaction', 'transaction', id, '删除了一笔记录');
+    }
+
     _transactions.removeWhere((t) => t.id == id);
     notifyListeners();
   }
@@ -1097,6 +1133,7 @@ class TransactionProvider extends ChangeNotifier {
     _currentBookId = bookId;
     await loadTransactions();
     await loadPeriodicTransactions();
+    await loadMembersForBook(bookId);
     notifyListeners();
   }
 
@@ -1123,6 +1160,7 @@ class TransactionProvider extends ChangeNotifier {
   Future<void> deleteBook(String id) async {
     if (id == 'default' || _books.length <= 1) return;
     final db = await _db.database;
+    await deleteBookSharedData(id);
     await db.delete('books', where: 'id = ?', whereArgs: [id]);
     await db.delete('transactions', where: 'book_id = ?',
         whereArgs: [id]);
@@ -1132,6 +1170,168 @@ class TransactionProvider extends ChangeNotifier {
       await loadTransactions();
     }
     notifyListeners();
+  }
+
+  // ==================== 共享账本 ====================
+
+  List<SharedMember> getMembers(String bookId) => _members[bookId] ?? [];
+  List<SharedInvitation> getInvitations(String bookId) => _invitations[bookId] ?? [];
+  List<SharedAuditLog> getAuditLogs(String bookId) => _auditLogs[bookId] ?? [];
+
+  SharedMember? get currentMember {
+    if (!(currentBook?.isShared ?? false) || _currentUserName.isEmpty) return null;
+    final members = _members[_currentBookId] ?? [];
+    try {
+      return members.firstWhere((m) => m.name == _currentUserName);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> loadMembersForBook(String bookId) async {
+    final db = await _db.database;
+    final maps = await db.query('shared_members', where: 'book_id = ?', whereArgs: [bookId]);
+    _members[bookId] = maps.map((m) => SharedMember.fromMap(m)).toList();
+    final invMaps = await db.query('shared_invitations', where: 'book_id = ?', whereArgs: [bookId]);
+    _invitations[bookId] = invMaps.map((m) => SharedInvitation.fromMap(m)).toList();
+    final logMaps = await db.query('shared_audit_log', where: 'book_id = ?', whereArgs: [bookId], orderBy: 'created_at DESC');
+    _auditLogs[bookId] = logMaps.map((m) => SharedAuditLog.fromMap(m)).toList();
+    notifyListeners();
+  }
+
+  Future<void> _writeAuditLog(Database db, String bookId, String action, String? targetType, String? targetId, String? detail) async {
+    final now = DateTime.now().toIso8601String();
+    final log = SharedAuditLog(
+      id: _uuid.v4(), bookId: bookId, memberName: _currentUserName,
+      action: action, targetType: targetType, targetId: targetId,
+      detail: detail, createdAt: now,
+    );
+    await db.insert('shared_audit_log', log.toMap());
+    _auditLogs.putIfAbsent(bookId, () => []);
+    _auditLogs[bookId]!.insert(0, log);
+  }
+
+  Future<Book> createSharedBook({required String name, required String creatorName, String color = '0xFF5C6BC0'}) async {
+    _currentUserName = creatorName;
+    final now = DateTime.now().toIso8601String();
+    final book = Book(id: _uuid.v4(), name: name, icon: '0xe7fb',
+        color: color, type: 1, isShared: true, createdAt: now, updatedAt: now);
+    final db = await _db.database;
+    await db.insert('books', book.toMap());
+    _books.add(book);
+
+    final member = SharedMember(id: _uuid.v4(), bookId: book.id,
+        name: creatorName, role: 0, joinedAt: now);
+    await db.insert('shared_members', member.toMap());
+    _members[book.id] = [member];
+
+    await _writeAuditLog(db, book.id, 'create_book', 'book', book.id, '创建了共享账本');
+    notifyListeners();
+    return book;
+  }
+
+  Future<void> addMember(String bookId, String name, int role) async {
+    final now = DateTime.now().toIso8601String();
+    final member = SharedMember(id: _uuid.v4(), bookId: bookId,
+        name: name, role: role, joinedAt: now);
+    final db = await _db.database;
+    await db.insert('shared_members', member.toMap());
+    _members.putIfAbsent(bookId, () => []);
+    _members[bookId]!.add(member);
+    await _writeAuditLog(db, bookId, 'add_member', 'member', member.id, '添加了成员 "$name"');
+    notifyListeners();
+  }
+
+  Future<void> removeMember(String memberId, String bookId) async {
+    final members = _members[bookId] ?? [];
+    final member = members.firstWhere((m) => m.id == memberId);
+    final db = await _db.database;
+    await db.delete('shared_members', where: 'id = ?', whereArgs: [memberId]);
+    _members[bookId] = members.where((m) => m.id != memberId).toList();
+    await _writeAuditLog(db, bookId, 'remove_member', 'member', memberId, '移除了成员 "${member.name}"');
+    notifyListeners();
+  }
+
+  Future<void> updateMemberRole(String memberId, String bookId, int newRole) async {
+    final members = _members[bookId] ?? [];
+    final idx = members.indexWhere((m) => m.id == memberId);
+    if (idx == -1) return;
+    final updated = members[idx].copyWith(role: newRole);
+    final db = await _db.database;
+    await db.update('shared_members', updated.toMap(), where: 'id = ?', whereArgs: [memberId]);
+    _members[bookId]![idx] = updated;
+    await _writeAuditLog(db, bookId, 'update_member_role', 'member', memberId, '更新了 "${updated.name}" 的角色为 ${updated.roleLabel}');
+    notifyListeners();
+  }
+
+  Future<SharedInvitation> generateInviteCode(String bookId, int role) async {
+    final now = DateTime.now().toIso8601String();
+    String code;
+    do {
+      code = InviteService.generateCode();
+    } while ((_invitations[bookId] ?? []).any((i) => i.code == code && i.isActive));
+
+    final invitation = SharedInvitation(
+      id: _uuid.v4(), bookId: bookId, code: code, role: role,
+      createdAt: now, expiresAt: DateTime.now().add(const Duration(days: 7)).toIso8601String(),
+    );
+    final db = await _db.database;
+    await db.insert('shared_invitations', invitation.toMap());
+    _invitations.putIfAbsent(bookId, () => []);
+    _invitations[bookId]!.insert(0, invitation);
+    notifyListeners();
+    return invitation;
+  }
+
+  Future<String?> joinByInviteCode(String code, String memberName) async {
+    if (!InviteService.isValidCode(code)) return '无效的邀请码格式';
+    final db = await _db.database;
+    final maps = await db.query('shared_invitations', where: 'code = ? AND is_active = 1', whereArgs: [code.toUpperCase()]);
+    if (maps.isEmpty) return '邀请码不存在或已失效';
+
+    final invitation = SharedInvitation.fromMap(maps.first);
+    if (invitation.isExpired) return '邀请码已过期';
+
+    // Check if already a member
+    final existingMembers = await db.query('shared_members', where: 'book_id = ? AND name = ?', whereArgs: [invitation.bookId, memberName]);
+    if (existingMembers.isNotEmpty) return '你已经是该账本的成员了';
+
+    // Add member
+    final now = DateTime.now().toIso8601String();
+    final member = SharedMember(id: _uuid.v4(), bookId: invitation.bookId,
+        name: memberName, role: invitation.role, joinedAt: now);
+    await db.insert('shared_members', member.toMap());
+    _members.putIfAbsent(invitation.bookId, () => []);
+    _members[invitation.bookId]!.add(member);
+
+    _currentUserName = memberName;
+    await _writeAuditLog(db, invitation.bookId, 'join_book', 'member', member.id, '"$memberName" 通过邀请码加入了账本');
+
+    // Reload the book list to include the joined book
+    await loadBooks();
+    notifyListeners();
+    return null; // success
+  }
+
+  Future<void> deleteInvitation(String id, String bookId) async {
+    final db = await _db.database;
+    await db.update('shared_invitations', {'is_active': 0}, where: 'id = ?', whereArgs: [id]);
+    final list = _invitations[bookId] ?? [];
+    final idx = list.indexWhere((i) => i.id == id);
+    if (idx != -1) {
+      list[idx] = list[idx].copyWith(isActive: false);
+    }
+    notifyListeners();
+  }
+
+  Future<void> deleteBookSharedData(String bookId) async {
+    final db = await _db.database;
+    await db.delete('shared_members', where: 'book_id = ?', whereArgs: [bookId]);
+    await db.delete('shared_invitations', where: 'book_id = ?', whereArgs: [bookId]);
+    await db.delete('shared_audit_log', where: 'book_id = ?', whereArgs: [bookId]);
+    _members.remove(bookId);
+    _invitations.remove(bookId);
+    _auditLogs.remove(bookId);
   }
 
   // ==================== 债务管理 ====================

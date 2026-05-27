@@ -91,8 +91,16 @@ class _HomeScreenState extends State<HomeScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-            '${provider.currentBook?.name ?? "记账"} · ${now.month}月'),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('${provider.currentBook?.name ?? "记账"} · ${now.month}月'),
+            if (provider.currentBook?.isShared ?? false) ...[
+              const SizedBox(width: 6),
+              Icon(Icons.group, size: 18, color: Theme.of(context).colorScheme.primary),
+            ],
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.search),

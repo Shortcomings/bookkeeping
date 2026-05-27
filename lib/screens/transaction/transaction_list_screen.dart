@@ -228,6 +228,8 @@ class _TransactionCard extends StatelessWidget {
     final amount = NumberFormat.currency(symbol: '¥', decimalDigits: 2)
         .format(transaction.amount / 100);
     final note = transaction.note;
+    final createdBy = transaction.createdBy;
+    final isShared = provider.currentBook?.isShared ?? false;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 4),
@@ -253,7 +255,13 @@ class _TransactionCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(cat?.name ?? '未知', style: const TextStyle(fontSize: 15)),
+                    Row(
+                      children: [
+                        Expanded(child: Text(cat?.name ?? '未知', style: const TextStyle(fontSize: 15))),
+                        if (isShared && createdBy != null && createdBy.isNotEmpty)
+                          Text(createdBy, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.outline)),
+                      ],
+                    ),
                     if (note != null && note.isNotEmpty)
                       Text(
                         note.length > 20 ? '${note.substring(0, 20)}...' : note,

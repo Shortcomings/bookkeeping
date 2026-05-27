@@ -20,6 +20,7 @@ import '../debt/debt_list_screen.dart';
 import '../reimbursement/reimbursement_list_screen.dart';
 import '../saving/saving_list_screen.dart';
 import '../import/import_preview_screen.dart';
+import '../book/join_book_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -413,6 +414,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.push(context, MaterialPageRoute(
                     builder: (_) => ChangeNotifierProvider.value(value: provider, child: const BookListScreen()),
+                  )),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
+                  leading: const Icon(Icons.group_add),
+                  title: const Text('加入共享账本'),
+                  subtitle: const Text('通过邀请码加入他人的共享账本'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => ChangeNotifierProvider.value(value: provider, child: const JoinBookScreen()),
                   )),
                 ),
                 const Divider(height: 1, indent: 56),

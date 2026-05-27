@@ -22,13 +22,53 @@ class DatabaseHelper {
     final path = join(dbPath, 'bookkeeping.db');
     return openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 4) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS shared_members (
+          id TEXT PRIMARY KEY,
+          book_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          role INTEGER NOT NULL DEFAULT 2,
+          joined_at TEXT NOT NULL,
+          FOREIGN KEY (book_id) REFERENCES books(id)
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS shared_invitations (
+          id TEXT PRIMARY KEY,
+          book_id TEXT NOT NULL,
+          code TEXT NOT NULL UNIQUE,
+          role INTEGER NOT NULL DEFAULT 2,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL,
+          expires_at TEXT,
+          FOREIGN KEY (book_id) REFERENCES books(id)
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS shared_audit_log (
+          id TEXT PRIMARY KEY,
+          book_id TEXT NOT NULL,
+          member_name TEXT NOT NULL,
+          action TEXT NOT NULL,
+          target_type TEXT,
+          target_id TEXT,
+          detail TEXT,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (book_id) REFERENCES books(id)
+        )
+      ''');
+      try {
+        await db.execute('ALTER TABLE transactions ADD COLUMN created_by TEXT');
+      } catch (_) {}
+    }
     if (oldVersion < 3) {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS ai_config (
@@ -146,6 +186,7 @@ class DatabaseHelper {
         reimbursement_status INTEGER NOT NULL DEFAULT 0,
         is_periodic INTEGER NOT NULL DEFAULT 0,
         periodic_id TEXT,
+        created_by TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY (category_id) REFERENCES categories(id),
@@ -301,6 +342,42 @@ class DatabaseHelper {
         content TEXT NOT NULL,
         created_at TEXT NOT NULL,
         FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE shared_members (
+        id TEXT PRIMARY KEY,
+        book_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        role INTEGER NOT NULL DEFAULT 2,
+        joined_at TEXT NOT NULL,
+        FOREIGN KEY (book_id) REFERENCES books(id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE shared_invitations (
+        id TEXT PRIMARY KEY,
+        book_id TEXT NOT NULL,
+        code TEXT NOT NULL UNIQUE,
+        role INTEGER NOT NULL DEFAULT 2,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        expires_at TEXT,
+        FOREIGN KEY (book_id) REFERENCES books(id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE shared_audit_log (
+        id TEXT PRIMARY KEY,
+        book_id TEXT NOT NULL,
+        member_name TEXT NOT NULL,
+        action TEXT NOT NULL,
+        target_type TEXT,
+        target_id TEXT,
+        detail TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (book_id) REFERENCES books(id)
       )
     ''');
 

@@ -14,6 +14,7 @@ class Transaction {
   final int reimbursementStatus; // 0=none, 1=pending, 2=submitted, 3=reimbursed
   final bool isPeriodic;
   final String? periodicId;
+  final String? createdBy;
   final String createdAt;
   final String updatedAt;
 
@@ -33,6 +34,7 @@ class Transaction {
     this.reimbursementStatus = 0,
     this.isPeriodic = false,
     this.periodicId,
+    this.createdBy,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -53,6 +55,7 @@ class Transaction {
         'reimbursement_status': reimbursementStatus,
         'is_periodic': isPeriodic ? 1 : 0,
         'periodic_id': periodicId,
+        'created_by': createdBy,
         'created_at': createdAt,
         'updated_at': updatedAt,
       };
@@ -73,6 +76,7 @@ class Transaction {
         reimbursementStatus: (map['reimbursement_status'] as int?) ?? 0,
         isPeriodic: (map['is_periodic'] as int?) == 1,
         periodicId: map['periodic_id'] as String?,
+        createdBy: map['created_by'] as String?,
         createdAt: map['created_at'] as String,
         updatedAt: map['updated_at'] as String,
       );
@@ -93,6 +97,7 @@ class Transaction {
     int? reimbursementStatus,
     bool? isPeriodic,
     String? periodicId,
+    String? createdBy,
     String? createdAt,
     String? updatedAt,
   }) =>
@@ -112,6 +117,7 @@ class Transaction {
         reimbursementStatus: reimbursementStatus ?? this.reimbursementStatus,
         isPeriodic: isPeriodic ?? this.isPeriodic,
         periodicId: periodicId ?? this.periodicId,
+        createdBy: createdBy ?? this.createdBy,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
       );

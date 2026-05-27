@@ -12,8 +12,10 @@ class BookEditScreen extends StatefulWidget {
 }
 
 class _BookEditScreenState extends State<BookEditScreen> {
-  late String _name;
+  late final TextEditingController _nameCtrl;
   late String _color;
+  late bool _isShared;
+  final _creatorNameCtrl = TextEditingController();
   bool _saving = false;
   bool get _isEditing => widget.book != null;
 
@@ -25,14 +27,28 @@ class _BookEditScreenState extends State<BookEditScreen> {
   @override
   void initState() {
     super.initState();
-    _name = widget.book?.name ?? '';
+    _nameCtrl = TextEditingController(text: widget.book?.name ?? '');
     _color = widget.book?.color ?? _colors[0];
+    _isShared = widget.book?.isShared ?? false;
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _creatorNameCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _save() async {
-    if (_name.trim().isEmpty) {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请输入账本名称')));
+      return;
+    }
+    if (!_isEditing && _isShared && _creatorNameCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('共享账本需要输入你的名称')));
       return;
     }
     setState(() => _saving = true);
@@ -40,9 +56,15 @@ class _BookEditScreenState extends State<BookEditScreen> {
     try {
       if (_isEditing) {
         await provider.updateBook(widget.book!.copyWith(
-            name: _name.trim(), color: _color));
+            name: name, color: _color));
+      } else if (_isShared) {
+        await provider.createSharedBook(
+          name: name,
+          creatorName: _creatorNameCtrl.text.trim(),
+          color: _color,
+        );
       } else {
-        await provider.addBook(name: _name.trim(), color: _color);
+        await provider.addBook(name: name, color: _color);
       }
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
@@ -57,8 +79,7 @@ class _BookEditScreenState extends State<BookEditScreen> {
       body: ListView(padding: const EdgeInsets.all(16), children: [
         TextField(
           decoration: const InputDecoration(labelText: '账本名称', border: OutlineInputBorder()),
-          controller: TextEditingController(text: _name),
-          onChanged: (v) => _name = v,
+          controller: _nameCtrl,
         ),
         const SizedBox(height: 16),
         Text('颜色', style: Theme.of(context).textTheme.labelLarge),
@@ -75,6 +96,28 @@ class _BookEditScreenState extends State<BookEditScreen> {
             ),
           );
         }).toList()),
+        const SizedBox(height: 16),
+        if (!_isEditing) ...[
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('共享账本'),
+            subtitle: const Text('邀请他人共同记账'),
+            value: _isShared,
+            onChanged: (v) => setState(() => _isShared = v),
+          ),
+          if (_isShared) ...[
+            const SizedBox(height: 8),
+            TextField(
+              controller: _creatorNameCtrl,
+              decoration: const InputDecoration(
+                labelText: '你的名称',
+                hintText: '在共享账本中显示的名称',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.person),
+              ),
+            ),
+          ],
+        ],
         const SizedBox(height: 24),
         FilledButton(onPressed: _saving ? null : _save,
           style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
