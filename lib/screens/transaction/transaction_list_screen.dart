@@ -5,6 +5,7 @@ import '../../providers/transaction_provider.dart';
 import '../../models/transaction.dart';
 import 'add_transaction_sheet.dart';
 import '../search/search_screen.dart';
+import '../../widgets/empty_state_widget.dart';
 
 class TransactionListScreen extends StatelessWidget {
   const TransactionListScreen({super.key});
@@ -296,37 +297,28 @@ class _TransactionCard extends StatelessWidget {
 class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.receipt_long_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.outline.withAlpha(100)),
-          const SizedBox(height: 16),
-          Text('还没有账单记录',
-              style: TextStyle(color: Theme.of(context).colorScheme.outline)),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: () {
-              final provider = context.read<TransactionProvider>();
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                useSafeArea: true,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                ),
-                builder: (_) => ChangeNotifierProvider.value(
-                  value: provider,
-                  child: const AddTransactionSheet(),
-                ),
-              );
-            },
-            icon: const Icon(Icons.add),
-            label: const Text('记第一笔账'),
-          ),
-        ],
+    return EmptyStateWidget(
+      icon: Icons.receipt_long_outlined,
+      title: '还没有账单记录',
+      subtitle: '开始记录你的第一笔收支吧',
+      action: FilledButton.icon(
+        onPressed: () {
+          final provider = context.read<TransactionProvider>();
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            useSafeArea: true,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            builder: (_) => ChangeNotifierProvider.value(
+              value: provider,
+              child: const AddTransactionSheet(),
+            ),
+          );
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('记一笔'),
       ),
     );
   }

@@ -15,7 +15,6 @@ class _AccountTransferScreenState extends State<AccountTransferScreen> {
   String? _fromId;
   String? _toId;
   String _amount = '';
-  String _note = '';
   bool _saving = false;
 
   @override
@@ -92,16 +91,6 @@ class _AccountTransferScreenState extends State<AccountTransferScreen> {
             onChanged: (v) => _amount = v,
           ),
           const SizedBox(height: 16),
-
-          // 备注
-          TextField(
-            decoration: const InputDecoration(
-              labelText: '备注（可选）',
-              border: OutlineInputBorder(),
-            ),
-            onChanged: (v) => _note = v,
-          ),
-          const SizedBox(height: 8),
 
           // 预览
           if (fromAccount != null && toAccount != null && _amount.isNotEmpty)

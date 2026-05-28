@@ -266,7 +266,7 @@ class _DayPicker extends StatelessWidget {
         labelText: label,
         border: const OutlineInputBorder(),
       ),
-      value: value,
+      initialValue: value,
       items: [
         const DropdownMenuItem(value: null, child: Text('未设置')),
         ...items.map((d) => DropdownMenuItem(value: d, child: Text('$d号'))),

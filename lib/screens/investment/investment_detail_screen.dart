@@ -108,6 +108,7 @@ class _InvestmentDetailScreenState extends State<InvestmentDetailScreen> {
       ),
     );
     if (confirm != true) return;
+    if (!mounted) return;
 
     final provider = context.read<TransactionProvider>();
     await provider.deleteTrade(tradeId);
@@ -166,7 +167,7 @@ class _InvestmentDetailScreenState extends State<InvestmentDetailScreen> {
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onPrimaryContainer)),
                 const SizedBox(height: 12),
                 Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-                  _buildInfoColumn('股数', '${(_inv.shares / 1000).toStringAsFixed(3)}', context),
+                  _buildInfoColumn('股数', (_inv.shares / 1000).toStringAsFixed(3), context),
                   _buildInfoColumn('成本', _currencyFormat.format(_inv.costBasis / 100), context),
                   _buildInfoColumn('盈亏', '${pl >= 0 ? "+" : ""}${_currencyFormat.format(pl / 100)}', context,
                       color: pl >= 0 ? Colors.green : Theme.of(context).colorScheme.error),

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../providers/transaction_provider.dart';
+import '../../widgets/empty_state_widget.dart';
 import '../../services/export_service.dart';
 import 'comparison_view.dart';
 
@@ -138,18 +139,10 @@ class _StatisticsScreenState extends State<StatisticsScreen>
           : _selectedTab == 4
           ? _buildAdvancedReport(context)
           : filteredTxs.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.pie_chart_outline,
-                      size: 64,
-                      color: Theme.of(context).colorScheme.outline.withAlpha(100)),
-                  const SizedBox(height: 16),
-                  Text('${tabLabels[_selectedTab]}暂无数据',
-                      style: TextStyle(color: Theme.of(context).colorScheme.outline)),
-                ],
-              ),
+          ? EmptyStateWidget(
+              icon: Icons.pie_chart_outline,
+              title: '${tabLabels[_selectedTab]}暂无数据',
+              subtitle: '记几笔账后这里就会出现统计图表',
             )
           : ListView(
               padding: const EdgeInsets.all(16),

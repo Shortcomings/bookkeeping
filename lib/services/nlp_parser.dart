@@ -1,5 +1,3 @@
-import 'package:intl/intl.dart';
-
 class NlpResult {
   final double? amount;
   final DateTime? date;

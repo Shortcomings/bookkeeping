@@ -86,6 +86,8 @@ class _AIChatScreenState extends State<AIChatScreen> {
       await _service.updateSessionTitle(_currentSession!.id, title);
     }
 
+    if (!mounted) return;
+
     // Build context and send
     final provider = context.read<TransactionProvider>();
     final contextData = _service.buildFinancialContext(provider);

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import '../../providers/transaction_provider.dart';
 import '../../models/periodic_transaction.dart';
 
@@ -228,7 +227,7 @@ class _PeriodicEditScreenState extends State<PeriodicEditScreen> {
           // 账户
           if (accounts.isNotEmpty)
             DropdownButtonFormField<String?>(
-              value: _accountId,
+              initialValue: _accountId,
               decoration: const InputDecoration(
                 labelText: '账户（可选）',
                 border: OutlineInputBorder(),

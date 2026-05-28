@@ -148,7 +148,7 @@ class _ComparisonViewState extends State<ComparisonView> {
         Row(
           children: [
             Expanded(child: _ComparisonCard(
-              title: '${_currentYear}年支出',
+              title: '$_currentYear年支出',
               current:
                   currencyFormat.format(currentYearTotal / 100),
               previous: currencyFormat

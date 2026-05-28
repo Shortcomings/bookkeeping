@@ -521,7 +521,7 @@ class _FilterPanel extends StatelessWidget {
             children: [
               Expanded(
                 child: DropdownButtonFormField<String?>(
-                  value: accountId,
+                  initialValue: accountId,
                   decoration: const InputDecoration(
                     labelText: '账户',
                     isDense: true,
@@ -541,7 +541,7 @@ class _FilterPanel extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: DropdownButtonFormField<String?>(
-                  value: categoryId,
+                  initialValue: categoryId,
                   decoration: const InputDecoration(
                     labelText: '分类',
                     isDense: true,

@@ -119,7 +119,7 @@ class _AISettingsScreenState extends State<AISettingsScreen> {
                   Text('服务商', style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<int>(
-                    value: _providerIndex,
+                    initialValue: _providerIndex,
                     items: List.generate(
                       aiProviders.length,
                       (i) => DropdownMenuItem(
@@ -242,7 +242,7 @@ class _AISettingsScreenState extends State<AISettingsScreen> {
                     Text('模型', style: Theme.of(context).textTheme.titleSmall),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
-                      value: aiProviders[_providerIndex]
+                    initialValue: aiProviders[_providerIndex]
                               .models
                               .contains(_modelController.text)
                           ? _modelController.text

@@ -109,7 +109,7 @@ class _InfoChip extends StatelessWidget {
         Text(label, style: const TextStyle(fontSize: 10)),
         Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
             color: urgent ? Theme.of(context).colorScheme.error : null)),
-        if (days != null) Text('${days! > 0 ? "$days天后" : "今天"}', style: const TextStyle(fontSize: 10)),
+        if (days != null) Text(days! > 0 ? '$days天后' : '今天', style: const TextStyle(fontSize: 10)),
       ]),
     );
   }

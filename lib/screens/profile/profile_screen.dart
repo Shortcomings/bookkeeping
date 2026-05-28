@@ -138,7 +138,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
     await PlatformService.saveAndShareBytes(
-      '记账导出_${startDate}_${endDate}.xlsx',
+      '记账导出_${startDate}_$endDate.xlsx',
       encoded,
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       '记账导出',
@@ -168,7 +168,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final csvString = const ListToCsvConverter().convert(rows);
     await PlatformService.saveAndShareCsv(
-      '记账导出_${startDate}_${endDate}.csv',
+      '记账导出_${startDate}_$endDate.csv',
       csvString,
       '记账导出',
     );

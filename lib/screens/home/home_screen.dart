@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../providers/transaction_provider.dart';
 import '../../models/transaction.dart';
 import '../../services/auto_bookkeeping_service.dart';
+import '../../widgets/empty_state_widget.dart';
 import '../transaction/add_transaction_sheet.dart';
 import '../budget/budget_screen.dart';
 import '../periodic/periodic_list_screen.dart';
@@ -502,25 +503,11 @@ class _PeriodicBanner extends StatelessWidget {
 class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 60),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(Icons.receipt_long_outlined,
-                size: 64,
-                color: Theme.of(context).colorScheme.outline.withAlpha(100)),
-            const SizedBox(height: 16),
-            Text('还没有记录',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.outline)),
-            const SizedBox(height: 8),
-            Text('点击右下角按钮记第一笔账吧',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.outline)),
-          ],
-        ),
-      ),
+    return EmptyStateWidget(
+      icon: Icons.auto_awesome,
+      title: '开始你的记账之旅',
+      subtitle: '点击右下角按钮，3秒记一笔',
+      action: const SizedBox.shrink(),
     );
   }
 }

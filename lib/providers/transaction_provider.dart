@@ -1029,11 +1029,6 @@ class TransactionProvider extends ChangeNotifier {
     return keywords.toList();
   }
 
-  void _checkBudgetAlert() {
-    if (_budgets.isEmpty) return;
-    // Budget alert is triggered on HomeScreen load, no persistent notification needed
-  }
-
   // ==================== 自动记账导入 ====================
 
   /// Import a single auto-detected transaction with category matching and dedup.
