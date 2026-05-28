@@ -22,13 +22,29 @@ class DatabaseHelper {
     final path = join(dbPath, 'bookkeeping.db');
     return openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 5) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS push_config (
+          id INTEGER PRIMARY KEY DEFAULT 1,
+          provider TEXT NOT NULL DEFAULT 'serverchan',
+          push_key TEXT NOT NULL DEFAULT '',
+          daily_summary_enabled INTEGER NOT NULL DEFAULT 0,
+          budget_alert_enabled INTEGER NOT NULL DEFAULT 0,
+          budget_alert_pct INTEGER NOT NULL DEFAULT 80,
+          last_daily_push_date TEXT,
+          last_budget_alert_date TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      ''');
+    }
     if (oldVersion < 4) {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS shared_members (
@@ -378,6 +394,21 @@ class DatabaseHelper {
         detail TEXT,
         created_at TEXT NOT NULL,
         FOREIGN KEY (book_id) REFERENCES books(id)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS push_config (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        provider TEXT NOT NULL DEFAULT 'serverchan',
+        push_key TEXT NOT NULL DEFAULT '',
+        daily_summary_enabled INTEGER NOT NULL DEFAULT 0,
+        budget_alert_enabled INTEGER NOT NULL DEFAULT 0,
+        budget_alert_pct INTEGER NOT NULL DEFAULT 80,
+        last_daily_push_date TEXT,
+        last_budget_alert_date TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
       )
     ''');
 

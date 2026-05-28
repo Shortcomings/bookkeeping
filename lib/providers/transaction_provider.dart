@@ -13,6 +13,7 @@ import '../models/debt.dart';
 import '../models/debt_repayment.dart';
 import '../models/saving_goal.dart';
 import '../models/investment.dart';
+import '../services/push_service.dart';
 import '../models/investment_trade.dart';
 import '../models/shared_member.dart';
 import '../models/shared_invitation.dart';
@@ -123,6 +124,10 @@ class TransactionProvider extends ChangeNotifier {
     }
 
     notifyListeners();
+
+    if (type == 0) {
+      PushService().checkBudgetAfterTransaction(this);
+    }
   }
 
   Future<void> updateTransaction(Transaction tx) async {
@@ -159,6 +164,10 @@ class TransactionProvider extends ChangeNotifier {
     }
 
     notifyListeners();
+
+    if (tx.type == 0) {
+      PushService().checkBudgetAfterTransaction(this);
+    }
   }
 
   Future<void> deleteTransaction(String id) async {

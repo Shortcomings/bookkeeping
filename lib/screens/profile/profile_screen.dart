@@ -19,6 +19,7 @@ import '../reimbursement/reimbursement_list_screen.dart';
 import '../saving/saving_list_screen.dart';
 import '../import/import_preview_screen.dart';
 import '../book/join_book_screen.dart';
+import '../integration/push_settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -452,6 +453,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   subtitle: const Text('从微信/支付宝通知自动识别收支'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _showAutoBookkeepingSettings(context),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
+                  leading: const Icon(Icons.notifications_outlined),
+                  title: const Text('微信推送'),
+                  subtitle: const Text('每日消费总结、预算超限提醒推送到微信'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChangeNotifierProvider.value(
+                        value: provider,
+                        child: const PushSettingsScreen(),
+                      ),
+                    ),
+                  ),
                 ),
                 const Divider(height: 1, indent: 56),
                 ListTile(

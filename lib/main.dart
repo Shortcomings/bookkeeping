@@ -6,6 +6,7 @@ import 'package:window_manager/window_manager.dart';
 import 'providers/transaction_provider.dart';
 import 'database/db_factory.dart';
 import 'services/auto_bookkeeping_service.dart';
+import 'services/push_service.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/transaction/transaction_list_screen.dart';
 import 'screens/statistics/statistics_screen.dart';
@@ -35,6 +36,7 @@ void main() async {
   final provider = TransactionProvider();
   await provider.init();
   AutoBookkeepingService().initialize();
+  PushService().initialize(provider);
 
   runApp(
     ChangeNotifierProvider.value(
