@@ -96,9 +96,9 @@ class TransactionListScreen extends StatelessWidget {
 
     if (diff == 0) return '今天';
     if (diff == 1) return '昨天';
-    if (diff < 7) return '本周';
-    if (target.year == now.year && target.month == now.month) return '本月';
-    return DateFormat('yyyy年M月d日').format(date);
+    final weekdays = ['一', '二', '三', '四', '五', '六', '日'];
+    final wd = weekdays[target.weekday - 1];
+    return '${target.month}月${target.day}日 周$wd';
   }
 
   Future<bool?> _showDeleteDialog(BuildContext context, String txId) {

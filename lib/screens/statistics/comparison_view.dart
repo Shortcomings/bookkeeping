@@ -312,11 +312,10 @@ class _TrendChart extends StatelessWidget {
   Widget build(BuildContext context) {
     if (trend.isEmpty) return const SizedBox();
 
-    final maxVal = trend.fold<double>(
-        0,
-        (max, s) => s.expense.toDouble() > max
-            ? s.expense.toDouble()
-            : max);
+    final maxVal = trend.fold<double>(0, (max, s) {
+      final v = s.expense > s.income ? s.expense.toDouble() : s.income.toDouble();
+      return v > max ? v : max;
+    }) * 1.1; // 10% headroom
 
     return CustomPaint(
       size: const Size(double.infinity, 200),
@@ -352,9 +351,11 @@ class _TrendPainter extends CustomPainter {
 
     final paint = Paint()..strokeWidth = 2;
     final leftPadding = 40.0;
+    final rightPadding = 12.0;
     final bottomPadding = 20.0;
-    final chartWidth = size.width - leftPadding;
-    final chartHeight = size.height - bottomPadding - 20;
+    final topPadding = 20.0;
+    final chartWidth = size.width - leftPadding - rightPadding;
+    final chartHeight = size.height - bottomPadding - topPadding;
     final stepX = chartWidth / (trend.length - 1);
 
     // Draw grid lines
@@ -362,19 +363,19 @@ class _TrendPainter extends CustomPainter {
       ..color = Colors.grey.withAlpha(30)
       ..strokeWidth = 1;
     for (int i = 0; i <= 4; i++) {
-      final y = 20 + chartHeight * (1 - i / 4);
+      final y = topPadding + chartHeight * (1 - i / 4);
       canvas.drawLine(
-          Offset(leftPadding, y), Offset(size.width, y), gridPaint);
+          Offset(leftPadding, y), Offset(size.width - rightPadding, y), gridPaint);
     }
 
     // Draw expense line
     paint.color = expenseColor;
     for (int i = 0; i < trend.length - 1; i++) {
       final x1 = leftPadding + stepX * i;
-      final y1 = 20 + chartHeight * (1 - trend[i].expense / maxVal);
+      final y1 = topPadding + chartHeight * (1 - trend[i].expense / maxVal);
       final x2 = leftPadding + stepX * (i + 1);
       final y2 =
-          20 + chartHeight * (1 - trend[i + 1].expense / maxVal);
+          topPadding + chartHeight * (1 - trend[i + 1].expense / maxVal);
       canvas.drawLine(Offset(x1, y1), Offset(x2, y2), paint);
     }
 
@@ -382,10 +383,10 @@ class _TrendPainter extends CustomPainter {
     paint.color = incomeColor;
     for (int i = 0; i < trend.length - 1; i++) {
       final x1 = leftPadding + stepX * i;
-      final y1 = 20 + chartHeight * (1 - trend[i].income / maxVal);
+      final y1 = topPadding + chartHeight * (1 - trend[i].income / maxVal);
       final x2 = leftPadding + stepX * (i + 1);
       final y2 =
-          20 + chartHeight * (1 - trend[i + 1].income / maxVal);
+          topPadding + chartHeight * (1 - trend[i + 1].income / maxVal);
       canvas.drawLine(Offset(x1, y1), Offset(x2, y2), paint);
     }
 

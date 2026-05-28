@@ -8,17 +8,33 @@ import '../transaction/add_transaction_sheet.dart';
 import '../budget/budget_screen.dart';
 import '../periodic/periodic_list_screen.dart';
 import '../import/auto_bookkeeping_review_sheet.dart';
+import '../search/search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final ValueChanged<int>? onTabChange;
   const HomeScreen({super.key, this.onTabChange});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HomeScreen> createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
+class HomeScreenState extends State<HomeScreen>
     with WidgetsBindingObserver {
+  void openAddTransaction() {
+    final provider = context.read<TransactionProvider>();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => ChangeNotifierProvider.value(
+        value: provider,
+        child: const AddTransactionSheet(),
+      ),
+    );
+  }
   @override
   void initState() {
     super.initState();
@@ -105,7 +121,14 @@ class _HomeScreenState extends State<HomeScreen>
           IconButton(
             icon: const Icon(Icons.search),
             tooltip: '搜索',
-            onPressed: () => widget.onTabChange?.call(1),
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(
+                builder: (_) => ChangeNotifierProvider.value(
+                  value: provider,
+                  child: const SearchScreen(),
+                ),
+              ));
+            },
           ),
         ],
       ),
@@ -179,18 +202,7 @@ class _HomeScreenState extends State<HomeScreen>
             ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'home_fab',
-        onPressed: () => showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          useSafeArea: true,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          builder: (_) => ChangeNotifierProvider.value(
-            value: provider,
-            child: const AddTransactionSheet(),
-          ),
-        ),
+        onPressed: openAddTransaction,
         icon: const Icon(Icons.add),
         label: const Text('记一笔'),
       ),

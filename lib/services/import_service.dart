@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+import 'package:charset/charset.dart';
 import 'package:csv/csv.dart';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
@@ -199,33 +199,36 @@ class ImportService {
       pickAndParseFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['csv', 'xlsx', 'xls'],
+      allowedExtensions: ['csv'],
       allowMultiple: false,
+      withData: true, // enable bytes on all platforms
     );
     if (result == null || result.files.isEmpty) return null;
 
     final file = result.files.first;
-    final path = file.path;
     final name = file.name;
-    if (path == null) return null;
+    final bytes = file.bytes;
+    if (bytes == null || bytes.isEmpty) return null;
 
     if (name.endsWith('.csv')) {
-      return _parseCsv(path, name);
+      return _parseCsvBytes(bytes, name);
     } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
-      return _parseExcel(path, name);
+      return _parseExcelBytes(bytes, name);
     }
     return null;
   }
 
-  static Future<({String fileName, List<String> headers, List<List<String>> rows, String? template})>
-      _parseCsv(String path, String name) async {
-    final bytes = await File(path).readAsBytes();
+  static ({String fileName, List<String> headers, List<List<String>> rows, String? template})
+      _parseCsvBytes(List<int> bytes, String name) {
     String content;
     try {
       content = utf8.decode(bytes);
+      // Check if the result contains replacement characters (indicates wrong encoding)
+      if (content.contains('�')) {
+        content = _tryDecode(bytes);
+      }
     } catch (_) {
-      // Fallback: allow malformed UTF-8 (handles mixed encodings)
-      content = utf8.decode(bytes, allowMalformed: true);
+      content = _tryDecode(bytes);
     }
     final parsed = const CsvToListConverter(eol: '\n').convert(content);
 
@@ -246,37 +249,40 @@ class ImportService {
     return (fileName: name, headers: headers, rows: rows, template: template);
   }
 
-  static Future<({String fileName, List<String> headers, List<List<String>> rows, String? template})>
-      _parseExcel(String path, String name) async {
-    final bytes = await File(path).readAsBytes();
-    final excel = Excel.decodeBytes(bytes);
-    final sheet = excel.tables.keys.firstOrNull;
-    if (sheet == null) {
+  static ({String fileName, List<String> headers, List<List<String>> rows, String? template})
+      _parseExcelBytes(List<int> bytes, String name) {
+    try {
+      final excel = Excel.decodeBytes(bytes);
+      final sheet = excel.tables.keys.firstOrNull;
+      if (sheet == null) {
+        return (fileName: name, headers: <String>[], rows: <List<String>>[], template: null);
+      }
+
+      final table = excel.tables[sheet]!;
+      if (table.rows.isEmpty) {
+        return (fileName: name, headers: <String>[], rows: <List<String>>[], template: null);
+      }
+
+      final headers = table.rows.first
+          .map((cell) => (cell?.value?.toString() ?? '').trim())
+          .toList();
+      final template = detectTemplate(headers);
+
+      final rows = table.rows.skip(1).map((row) {
+        return List.generate(headers.length, (i) {
+          if (i < row.length) {
+            return (row[i]?.value?.toString() ?? '').trim();
+          }
+          return '';
+        });
+      }).where((row) {
+        return row.any((c) => c.isNotEmpty);
+      }).toList();
+
+      return (fileName: name, headers: headers, rows: rows, template: template);
+    } catch (e) {
       return (fileName: name, headers: <String>[], rows: <List<String>>[], template: null);
     }
-
-    final table = excel.tables[sheet]!;
-    if (table.rows.isEmpty) {
-      return (fileName: name, headers: <String>[], rows: <List<String>>[], template: null);
-    }
-
-    final headers = table.rows.first
-        .map((cell) => (cell?.value?.toString() ?? '').trim())
-        .toList();
-    final template = detectTemplate(headers);
-
-    final rows = table.rows.skip(1).map((row) {
-      return List.generate(headers.length, (i) {
-        if (i < row.length) {
-          return (row[i]?.value?.toString() ?? '').trim();
-        }
-        return '';
-      });
-    }).where((row) {
-      return row.any((c) => c.isNotEmpty);
-    }).toList();
-
-    return (fileName: name, headers: headers, rows: rows, template: template);
   }
 
   /// Build preview rows with category matching from a parsed file.
@@ -325,12 +331,16 @@ class ImportService {
       }
       seen.add(dedupKey);
 
-      // Category auto-match from note/merchant name
-      final matchText = preview.noteStr ?? preview.categoryStr ?? '';
-      if (matchText.isNotEmpty) {
-        final match = NlpParser.matchCategoryFromText(matchText);
-        preview.matchedCategory = match.categoryName;
-        preview.matchedType = match.type;
+      // Category: use CSV category column if available, else NLP from note
+      if (preview.categoryStr != null && preview.categoryStr!.isNotEmpty) {
+        preview.matchedCategory = preview.categoryStr;
+      } else {
+        final noteText = preview.noteStr ?? '';
+        if (noteText.isNotEmpty) {
+          final match = NlpParser.matchCategoryFromText(noteText);
+          preview.matchedCategory = match.categoryName;
+          preview.matchedType = match.type;
+        }
       }
 
       previewRows.add(preview);
@@ -346,6 +356,7 @@ class ImportService {
     required List<ImportPreviewRow> previewRows,
     required ImportFieldMapping mapping,
   }) async {
+    final bookId = provider.currentBookId;
     int count = 0;
     for (final row in previewRows.where((r) => r.selected)) {
       final date = _normalizeDate(row.date ?? '');
@@ -364,15 +375,48 @@ class ImportService {
         }
       }
 
-      final note = row.noteStr ?? row.categoryStr ?? '导入数据';
-      final success = await provider.importAutoTransaction(
-        merchantName: note.length > 30 ? note.substring(0, 30) : note,
-        amountCents: amountCents,
-        type: type,
-        date: date,
-        sourceApp: '文件导入',
-      );
-      if (success) count++;
+      final note = row.noteStr ?? '导入数据';
+      final categoryName = row.categoryStr;
+
+      // Try direct category name match first, fallback to NLP
+      String? matchedCategoryId;
+      if (categoryName != null && categoryName.isNotEmpty) {
+        final cats = type == 1 ? provider.incomeCategories : provider.expenseCategories;
+        matchedCategoryId = cats
+            .where((c) => c.name == categoryName && c.isEnabled)
+            .firstOrNull
+            ?.id;
+      }
+
+      if (matchedCategoryId != null) {
+        // Direct category match — skip NLP
+        final accountId = provider.accounts
+            .where((a) => a.isEnabled)
+            .firstOrNull
+            ?.id;
+        await provider.addTransaction(
+          type: type,
+          amount: amountCents,
+          date: date,
+          categoryId: matchedCategoryId,
+          accountId: accountId,
+          bookId: bookId,
+          note: note,
+        );
+        count++;
+      } else {
+        // Fallback to NLP matching
+        final merchant = (note.length > 30) ? note.substring(0, 30) : note;
+        final success = await provider.importAutoTransaction(
+          merchantName: merchant,
+          amountCents: amountCents,
+          type: type,
+          date: date,
+          sourceApp: '文件导入',
+          bookId: bookId,
+        );
+        if (success) count++;
+      }
     }
     return count;
   }
@@ -387,6 +431,28 @@ class ImportService {
 
   static bool _isValidDate(String s) {
     return _normalizeDate(s).isNotEmpty;
+  }
+
+  static String _tryDecode(List<int> bytes) {
+    // Skip UTF-8 BOM if present
+    final data = (bytes.length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+        ? bytes.sublist(3)
+        : bytes;
+
+    // Try UTF-8 first
+    final utf8Result = utf8.decode(data, allowMalformed: true);
+    final replacementCount = '�'.allMatches(utf8Result).length;
+
+    // If many replacement characters, auto-detect encoding (GBK/other)
+    if (replacementCount > data.length / 10) {
+      try {
+        final encoding = Charset.detect(data, defaultEncoding: utf8);
+        if (encoding != null && encoding.name != 'utf-8') {
+          return encoding.decode(data);
+        }
+      } catch (_) {}
+    }
+    return utf8Result;
   }
 
   static String _normalizeDate(String s) {

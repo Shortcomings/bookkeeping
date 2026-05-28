@@ -1,9 +1,7 @@
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:csv/csv.dart';
 import 'package:intl/intl.dart';
 import '../providers/transaction_provider.dart';
+import 'platform_service.dart';
 
 class ExportService {
   static Future<void> exportToCsv(
@@ -35,11 +33,8 @@ class ExportService {
     }
 
     final csvData = const ListToCsvConverter().convert(rows);
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/记账导出_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv');
-    await file.writeAsString(csvData);
-
-    await Share.shareXFiles([XFile(file.path)], text: '记账数据导出');
+    final fileName = '记账导出_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
+    await PlatformService.saveAndShareCsv(fileName, csvData, '记账数据导出');
   }
 
   static Future<void> exportAdvancedReport(
@@ -71,10 +66,7 @@ class ExportService {
     }
 
     final csvData = const ListToCsvConverter().convert(rows);
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/高级报表_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv');
-    await file.writeAsString(csvData);
-
-    await Share.shareXFiles([XFile(file.path)], text: '高级报表');
+    final fileName = '高级报表_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
+    await PlatformService.saveAndShareCsv(fileName, csvData, '高级报表');
   }
 }

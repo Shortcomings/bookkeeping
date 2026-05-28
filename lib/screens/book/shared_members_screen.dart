@@ -156,7 +156,7 @@ class _SharedMembersScreenState extends State<SharedMembersScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(m.roleLabel, style: TextStyle(color: color, fontSize: 12)),
@@ -181,7 +181,7 @@ class _SharedMembersScreenState extends State<SharedMembersScreen> {
               const SizedBox(height: 12),
               DropdownButtonFormField<int>(
                 decoration: const InputDecoration(labelText: '角色', border: OutlineInputBorder()),
-                value: selectedRole,
+                initialValue: selectedRole,
                 items: const [
                   DropdownMenuItem(value: 1, child: Text('管理员')),
                   DropdownMenuItem(value: 2, child: Text('普通成员')),

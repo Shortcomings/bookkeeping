@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:excel/excel.dart';
 import 'package:csv/csv.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
 import '../../providers/transaction_provider.dart';
+import '../../services/platform_service.dart';
 import '../../models/transaction.dart';
 import '../../services/auto_bookkeeping_service.dart';
 import '../../services/import_service.dart';
@@ -76,16 +74,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.table_chart_outlined),
-              title: const Text('Excel (.xlsx)'),
-              subtitle: const Text('适合在电脑上查看和编辑'),
-              onTap: () => Navigator.pop(ctx, 'excel'),
+              leading: const Icon(Icons.description_outlined),
+              title: const Text('CSV (.csv) — 推荐'),
+              subtitle: const Text('通用格式，支持导出后编辑再导入'),
+              onTap: () => Navigator.pop(ctx, 'csv'),
             ),
             ListTile(
-              leading: const Icon(Icons.description_outlined),
-              title: const Text('CSV (.csv)'),
-              subtitle: const Text('通用格式，兼容性最好'),
-              onTap: () => Navigator.pop(ctx, 'csv'),
+              leading: const Icon(Icons.table_chart_outlined),
+              title: const Text('Excel (.xlsx)'),
+              subtitle: const Text('适合查看和打印，不支持重新导入'),
+              onTap: () => Navigator.pop(ctx, 'excel'),
             ),
           ],
         ),
@@ -106,7 +104,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final provider = context.read<TransactionProvider>();
 
     final excel = Excel.createExcel();
-    final sheet = excel['账单导出'];
+    final sheet = excel.tables.values.first;
 
     sheet.appendRow([
       TextCellValue('日期'),
@@ -124,27 +122,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
         TextCellValue(tx.date),
         TextCellValue(tx.type == 0 ? '支出' : '收入'),
         TextCellValue(cat?.name ?? '未知'),
-        DoubleCellValue(tx.amount / 100),
+        TextCellValue((tx.amount / 100).toStringAsFixed(2)),
         TextCellValue(acc?.name ?? ''),
         TextCellValue(tx.note ?? ''),
       ]);
     }
 
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File(
-        '${dir.path}/记账导出_${startDate}_${endDate}.xlsx');
     final encoded = excel.encode();
-    if (encoded != null) {
-      await file.writeAsBytes(encoded);
-    } else if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Excel 编码失败')));
+    if (encoded == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Excel 编码失败')));
+      }
       return;
     }
-
-    if (context.mounted) {
-      await Share.shareXFiles([XFile(file.path)]);
-    }
+    await PlatformService.saveAndShareBytes(
+      '记账导出_${startDate}_${endDate}.xlsx',
+      encoded,
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '记账导出',
+    );
   }
 
   Future<void> _exportCsv(BuildContext context, List<Transaction> txs,
@@ -169,19 +166,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     final csvString = const ListToCsvConverter().convert(rows);
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File(
-        '${dir.path}/记账导出_${startDate}_${endDate}.csv');
-    await file.writeAsString(csvString);
-
-    if (context.mounted) {
-      await Share.shareXFiles([XFile(file.path)]);
-    }
+    await PlatformService.saveAndShareCsv(
+      '记账导出_${startDate}_${endDate}.csv',
+      csvString,
+      '记账导出',
+    );
   }
 
   Future<void> _showImport(BuildContext context) async {
     final result = await ImportService.pickAndParseFile();
-    if (result == null || !context.mounted) return;
+    if (!context.mounted) return;
+    if (result == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('文件读取失败，请确认选择了有效的 CSV 或 Excel 文件')),
+      );
+      return;
+    }
 
     if (result.headers.isEmpty || result.rows.isEmpty) {
       if (context.mounted) {
@@ -207,10 +207,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
 
-    if (imported != null && imported > 0 && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('成功导入 $imported 条交易记录')),
-      );
+    if (imported != null && context.mounted) {
+      if (imported > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('成功导入 $imported 条交易记录')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('没有可导入的数据，请检查列映射和日期/金额格式')),
+        );
+      }
     }
   }
 

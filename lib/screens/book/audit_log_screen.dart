@@ -81,7 +81,7 @@ class AuditLogScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: color,
                   shape: BoxShape.circle,
-                  border: Border.all(color: color.withOpacity(0.3), width: 2),
+                  border: Border.all(color: color.withValues(alpha: 0.3), width: 2),
                 ),
               ),
               if (index < total - 1)

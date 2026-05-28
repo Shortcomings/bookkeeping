@@ -40,6 +40,12 @@ dependencies:
   # 文件导入
   file_picker: ^8.0.0
 
+  # 编码检测（CSV 导入 GBK/UTF-8）
+  charset: ^2.0.1
+
+  # 桌面窗口管理
+  window_manager: ^0.4.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -1,12 +1,12 @@
 {
-    "name": "bookkeeping",
-    "short_name": "bookkeeping",
+    "name": "记账 - 个人财务管理",
+    "short_name": "记账",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#5C6BC0",
+    "theme_color": "#5C6BC0",
+    "description": "简洁专业的个人/家庭记账应用",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

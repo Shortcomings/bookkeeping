@@ -1035,6 +1035,7 @@ class TransactionProvider extends ChangeNotifier {
     required int type,
     required String date,
     String? sourceApp,
+    String bookId = 'default',
   }) async {
     // 1. Auto-match category
     final match = NlpParser.matchCategoryFromText(merchantName);
@@ -1073,6 +1074,7 @@ class TransactionProvider extends ChangeNotifier {
       date: date,
       categoryId: matchedCat.id,
       accountId: accountId,
+      bookId: bookId,
       note: note,
     );
 

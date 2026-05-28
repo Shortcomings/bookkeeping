@@ -17,6 +17,7 @@ class _StatisticsScreenState extends State<StatisticsScreen>
     with SingleTickerProviderStateMixin {
   int _selectedTab = 0; // 0=week, 1=month, 2=year
   String? _drillDownCategoryId;
+  int _touchedPieIndex = -1;
 
   late final TabController _tabController;
 
@@ -112,10 +113,10 @@ class _StatisticsScreenState extends State<StatisticsScreen>
         value: entry.value.toDouble(),
         title: percent >= 5 ? '${percent.toStringAsFixed(0)}%' : '',
         color: catColor,
-        radius: 55,
-        titleStyle: const TextStyle(
+        radius: _touchedPieIndex == colorIndex ? 65 : 55,
+        titleStyle: TextStyle(
           color: Colors.white,
-          fontSize: 10,
+          fontSize: _touchedPieIndex == colorIndex ? 12 : 10,
           fontWeight: FontWeight.w600,
         ),
       ));
@@ -216,15 +217,23 @@ class _StatisticsScreenState extends State<StatisticsScreen>
                         centerSpaceRadius: 40,
                         sectionsSpace: 2,
                         pieTouchData: PieTouchData(
+                          enabled: true,
                           touchCallback: (event, response) {
-                            if (event is FlTapUpEvent &&
-                                response?.touchedSection != null) {
+                            if (response?.touchedSection != null) {
                               final idx = response!.touchedSection!.touchedSectionIndex;
-                              if (idx < sortedCats.length) {
-                                setState(() {
-                                  _drillDownCategoryId = sortedCats[idx].key;
-                                });
+                              if (event is FlTapUpEvent) {
+                                if (idx < sortedCats.length) {
+                                  setState(() {
+                                    _drillDownCategoryId = sortedCats[idx].key;
+                                    _touchedPieIndex = -1;
+                                  });
+                                }
+                              } else {
+                                // Hover — keep section enlarged, no toggle
+                                setState(() => _touchedPieIndex = idx);
                               }
+                            } else if (_touchedPieIndex != -1) {
+                              setState(() => _touchedPieIndex = -1);
                             }
                           },
                         ),
@@ -311,6 +320,20 @@ class _StatisticsScreenState extends State<StatisticsScreen>
               ],
             ),
     );
+  }
+
+  double _chartMaxY(Iterable<double> values) {
+    if (values.isEmpty) return 100;
+    final max = values.reduce((a, b) => a > b ? a : b);
+    if (max <= 0) return 100;
+    return max * 1.2; // 20% headroom above highest point
+  }
+
+  double _chartMinY(Iterable<double> values) {
+    if (values.isEmpty) return 0;
+    final min = values.reduce((a, b) => a < b ? a : b);
+    if (min >= 0) return 0;
+    return min * 1.2; // 20% headroom below lowest point
   }
 
   Widget _buildAdvancedReport(BuildContext context) {
@@ -425,9 +448,22 @@ class _StatisticsScreenState extends State<StatisticsScreen>
               height: 240,
               child: LineChart(
                 LineChartData(
-                  gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: netWorth > 0 ? (netWorth / 500).round().clamp(1, 99999) * 100.0 : 100),
+                  minY: _chartMinY(netWorthPoints.map((p) => p.y)),
+                  maxY: _chartMaxY(netWorthPoints.map((p) => p.y)),
+                  gridData: FlGridData(show: true, drawVerticalLine: false),
                   titlesData: FlTitlesData(
-                    leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 60, getTitlesWidget: (value, meta) => Text(currencyFormat.format(value), style: const TextStyle(fontSize: 10)))),
+                    leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 56, getTitlesWidget: (value, meta) {
+                      final v = value.toDouble();
+                      String label;
+                      if (v.abs() >= 10000) {
+                        label = '${(v / 10000).toStringAsFixed(1)}万';
+                      } else if (v.abs() >= 1000) {
+                        label = '${(v / 1000).toStringAsFixed(1)}K';
+                      } else {
+                        label = v.toStringAsFixed(0);
+                      }
+                      return Text(label, style: const TextStyle(fontSize: 10));
+                    })),
                     bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, getTitlesWidget: (value, meta) {
                       final idx = value.toInt();
                       if (idx >= 0 && idx < cashFlow.length) {
@@ -443,6 +479,8 @@ class _StatisticsScreenState extends State<StatisticsScreen>
                     LineChartBarData(
                       spots: netWorthPoints,
                       isCurved: true,
+                      preventCurveOverShooting: true,
+                      curveSmoothness: 0.2,
                       color: Theme.of(context).colorScheme.primary,
                       barWidth: 2,
                       dotData: const FlDotData(show: true),

@@ -37,7 +37,7 @@ class _InvitationScreenState extends State<InvitationScreen> {
                   const SizedBox(height: 12),
                   DropdownButtonFormField<int>(
                     decoration: const InputDecoration(labelText: '新成员角色', border: OutlineInputBorder()),
-                    value: _selectedRole,
+                    initialValue: _selectedRole,
                     items: const [
                       DropdownMenuItem(value: 1, child: Text('管理员 — 可管理记录')),
                       DropdownMenuItem(value: 2, child: Text('普通成员 — 仅记账和查看')),
