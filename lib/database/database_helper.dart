@@ -22,13 +22,36 @@ class DatabaseHelper {
     final path = join(dbPath, 'bookkeeping.db');
     return openDatabase(
       path,
-      version: 5,
+      version: 8,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 8) {
+      try { await db.execute("ALTER TABLE feedback ADD COLUMN user_name TEXT NOT NULL DEFAULT ''"); } catch (_) {}
+      try { await db.execute("ALTER TABLE push_config ADD COLUMN default_user_name TEXT NOT NULL DEFAULT ''"); } catch (_) {}
+    }
+    if (oldVersion < 7) {
+      try { await db.execute("ALTER TABLE feedback ADD COLUMN issue_number INTEGER"); } catch (_) {}
+      try { await db.execute("ALTER TABLE feedback ADD COLUMN issue_state TEXT NOT NULL DEFAULT 'open'"); } catch (_) {}
+      try { await db.execute("UPDATE push_config SET feedback_key='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' WHERE feedback_key=''"); } catch (_) {}
+    }
+    if (oldVersion < 6) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS feedback (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          content TEXT NOT NULL,
+          type INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL
+        )
+      ''');
+      try {
+        await db.execute("ALTER TABLE push_config ADD COLUMN feedback_key TEXT NOT NULL DEFAULT ''");
+      } catch (_) {}
+    }
     if (oldVersion < 5) {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS push_config (
@@ -407,8 +430,23 @@ class DatabaseHelper {
         budget_alert_pct INTEGER NOT NULL DEFAULT 80,
         last_daily_push_date TEXT,
         last_budget_alert_date TEXT,
+        feedback_key TEXT NOT NULL DEFAULT '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',
+        default_user_name TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS feedback (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        type INTEGER NOT NULL DEFAULT 0,
+        user_name TEXT NOT NULL DEFAULT '',
+        issue_number INTEGER,
+        issue_state TEXT NOT NULL DEFAULT 'open',
+        created_at TEXT NOT NULL
       )
     ''');
 

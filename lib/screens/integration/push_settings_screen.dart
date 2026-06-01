@@ -14,6 +14,7 @@ class _PushSettingsScreenState extends State<PushSettingsScreen> {
   final _formKey = GlobalKey<FormState>();
   String _provider = 'serverchan';
   final _keyController = TextEditingController();
+  final _feedbackKeyController = TextEditingController();
   bool _dailySummaryEnabled = false;
   bool _budgetAlertEnabled = false;
   int _budgetAlertPct = 80;
@@ -29,6 +30,8 @@ class _PushSettingsScreenState extends State<PushSettingsScreen> {
     final config = await PushService().getConfig();
     _provider = config.provider;
     _keyController.text = config.pushKey;
+    _feedbackKeyController.text = config.feedbackKey;
+    _defaultUserName = config.defaultUserName;
     _dailySummaryEnabled = config.dailySummaryEnabled;
     _budgetAlertEnabled = config.budgetAlertEnabled;
     _budgetAlertPct = config.budgetAlertPct;
@@ -38,20 +41,25 @@ class _PushSettingsScreenState extends State<PushSettingsScreen> {
   @override
   void dispose() {
     _keyController.dispose();
+    _feedbackKeyController.dispose();
     super.dispose();
   }
 
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+  String _defaultUserName = '';
 
+  PushConfig _buildConfig() => PushConfig(
+    provider: _provider,
+    pushKey: _keyController.text.trim(),
+    feedbackKey: _feedbackKeyController.text.trim(),
+    defaultUserName: _defaultUserName,
+    dailySummaryEnabled: _dailySummaryEnabled,
+    budgetAlertEnabled: _budgetAlertEnabled,
+    budgetAlertPct: _budgetAlertPct,
+  );
+
+  Future<void> _save() async {
     setState(() => _loading = true);
-    await PushService().saveConfig(PushConfig(
-      provider: _provider,
-      pushKey: _keyController.text.trim(),
-      dailySummaryEnabled: _dailySummaryEnabled,
-      budgetAlertEnabled: _budgetAlertEnabled,
-      budgetAlertPct: _budgetAlertPct,
-    ));
+    await PushService().saveConfig(_buildConfig());
     setState(() => _loading = false);
 
     if (mounted) {
@@ -62,13 +70,14 @@ class _PushSettingsScreenState extends State<PushSettingsScreen> {
   }
 
   Future<void> _testPush() async {
-    if (!_formKey.currentState!.validate()) return;
-
+    if (_keyController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先填写推送 Key')),
+      );
+      return;
+    }
     setState(() => _loading = true);
-    final result = await PushService().testPush(PushConfig(
-      provider: _provider,
-      pushKey: _keyController.text.trim(),
-    ));
+    final result = await PushService().testPush(_buildConfig());
     setState(() => _loading = false);
 
     if (mounted) {
@@ -83,19 +92,16 @@ class _PushSettingsScreenState extends State<PushSettingsScreen> {
   }
 
   Future<void> _pushDailySummary() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_keyController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先填写推送 Key')),
+      );
+      return;
+    }
     final provider = context.read<TransactionProvider>();
 
-    final formConfig = PushConfig(
-      provider: _provider,
-      pushKey: _keyController.text.trim(),
-      dailySummaryEnabled: true,
-      budgetAlertEnabled: _budgetAlertEnabled,
-      budgetAlertPct: _budgetAlertPct,
-    );
-
     setState(() => _loading = true);
-    final result = await PushService().sendDailySummary(provider, configOverride: formConfig);
+    final result = await PushService().sendDailySummary(provider, configOverride: _buildConfig());
     setState(() => _loading = false);
 
     if (mounted) {
@@ -112,12 +118,13 @@ class _PushSettingsScreenState extends State<PushSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('微信推送设置')),
+      appBar: AppBar(title: const Text('推送与反馈设置')),
       body: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // ---- Push config section ----
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -145,7 +152,7 @@ class _PushSettingsScreenState extends State<PushSettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('获取 Key', style: Theme.of(context).textTheme.titleSmall),
+                    Text('推送 Key', style: Theme.of(context).textTheme.titleSmall),
                     const SizedBox(height: 4),
                     Text(
                       _provider == 'serverchan'
@@ -158,10 +165,9 @@ class _PushSettingsScreenState extends State<PushSettingsScreen> {
                       controller: _keyController,
                       decoration: InputDecoration(
                         labelText: _provider == 'serverchan' ? 'SendKey' : 'Token',
-                        hintText: '请输入推送 Key',
+                        hintText: '请输入推送 Key（可选）',
                         border: const OutlineInputBorder(),
                       ),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? '请输入 Key' : null,
                     ),
                   ],
                 ),
@@ -237,6 +243,42 @@ class _PushSettingsScreenState extends State<PushSettingsScreen> {
                 ),
               ),
             ),
+
+            const SizedBox(height: 24),
+
+            // ---- GitHub Token for feedback ----
+            Text('意见反馈',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('GitHub Token', style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 4),
+                    Text(
+                      '反馈将自动创建为 GitHub Issue。\n'
+                      '在 github.com/settings/tokens 生成 Classic Token，'
+                      '勾选 repo 权限即可。',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _feedbackKeyController,
+                      decoration: const InputDecoration(
+                        labelText: 'GitHub Token',
+                        hintText: 'ghp_xxxxxxxxxxxxxxxxxxxx',
+                        border: OutlineInputBorder(),
+                      ),
+                      obscureText: true,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
             const SizedBox(height: 16),
             Card(
               child: Padding(
@@ -245,10 +287,10 @@ class _PushSettingsScreenState extends State<PushSettingsScreen> {
                   children: [
                     Icon(Icons.info_outline, size: 18, color: Theme.of(context).colorScheme.primary),
                     const SizedBox(width: 8),
-                    Expanded(
+                    const Expanded(
                       child: Text(
-                        '定时推送将在您打开App时自动执行，无需保持后台运行。',
-                        style: Theme.of(context).textTheme.bodySmall,
+                        '推送和反馈两项配置互不影响，可分别填写。',
+                        style: TextStyle(fontSize: 13),
                       ),
                     ),
                   ],

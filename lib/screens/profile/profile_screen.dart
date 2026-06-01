@@ -20,6 +20,7 @@ import '../saving/saving_list_screen.dart';
 import '../import/import_preview_screen.dart';
 import '../book/join_book_screen.dart';
 import '../integration/push_settings_screen.dart';
+import '../feedback/feedback_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -485,6 +486,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   subtitle: const Text('从微信/支付宝账单或 CSV/Excel 文件导入'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _showImport(context),
+                ),
+                const Divider(height: 1, indent: 56),
+                ListTile(
+                  leading: const Icon(Icons.feedback_outlined),
+                  title: const Text('意见反馈'),
+                  subtitle: const Text('提建议、报 Bug，自动创建 GitHub Issue'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => const FeedbackScreen(),
+                  )),
                 ),
                 const Divider(height: 1, indent: 56),
                 ListTile(

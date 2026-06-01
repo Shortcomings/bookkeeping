@@ -4,6 +4,13 @@ import 'package:intl/intl.dart';
 import '../database/database_helper.dart';
 import '../providers/transaction_provider.dart';
 
+const _defaultFeedbackToken = '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';
+
+String _readFeedbackKey(String? value) {
+  if (value == null || value.isEmpty) return _defaultFeedbackToken;
+  return value;
+}
+
 class PushConfig {
   final int id;
   final String provider;
@@ -13,6 +20,8 @@ class PushConfig {
   final int budgetAlertPct;
   final String? lastDailyPushDate;
   final String? lastBudgetAlertDate;
+  final String feedbackKey;
+  final String defaultUserName;
 
   const PushConfig({
     this.id = 1,
@@ -23,6 +32,8 @@ class PushConfig {
     this.budgetAlertPct = 80,
     this.lastDailyPushDate,
     this.lastBudgetAlertDate,
+    this.feedbackKey = _defaultFeedbackToken,
+    this.defaultUserName = '',
   });
 
   Map<String, dynamic> toMap() => {
@@ -34,6 +45,8 @@ class PushConfig {
         'budget_alert_pct': budgetAlertPct,
         'last_daily_push_date': lastDailyPushDate,
         'last_budget_alert_date': lastBudgetAlertDate,
+        'feedback_key': feedbackKey,
+        'default_user_name': defaultUserName,
       };
 
   factory PushConfig.fromMap(Map<String, dynamic> map) => PushConfig(
@@ -45,6 +58,8 @@ class PushConfig {
         budgetAlertPct: (map['budget_alert_pct'] as int?) ?? 80,
         lastDailyPushDate: map['last_daily_push_date'] as String?,
         lastBudgetAlertDate: map['last_budget_alert_date'] as String?,
+        feedbackKey: _readFeedbackKey(map['feedback_key'] as String?),
+        defaultUserName: (map['default_user_name'] as String?) ?? '',
       );
 
   bool get isConfigured => pushKey.isNotEmpty;
@@ -166,6 +181,8 @@ class PushService {
       await saveConfig(PushConfig(
         provider: config.provider,
         pushKey: config.pushKey,
+        feedbackKey: config.feedbackKey,
+        defaultUserName: config.defaultUserName,
         dailySummaryEnabled: config.dailySummaryEnabled,
         budgetAlertEnabled: config.budgetAlertEnabled,
         budgetAlertPct: config.budgetAlertPct,
@@ -217,6 +234,8 @@ class PushService {
     await saveConfig(PushConfig(
       provider: config.provider,
       pushKey: config.pushKey,
+      feedbackKey: config.feedbackKey,
+      defaultUserName: config.defaultUserName,
       dailySummaryEnabled: config.dailySummaryEnabled,
       budgetAlertEnabled: config.budgetAlertEnabled,
       budgetAlertPct: config.budgetAlertPct,
