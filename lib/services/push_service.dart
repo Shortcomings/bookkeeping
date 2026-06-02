@@ -4,13 +4,6 @@ import 'package:intl/intl.dart';
 import '../database/database_helper.dart';
 import '../providers/transaction_provider.dart';
 
-const _defaultFeedbackToken = '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';
-
-String _readFeedbackKey(String? value) {
-  if (value == null || value.isEmpty) return _defaultFeedbackToken;
-  return value;
-}
-
 class PushConfig {
   final int id;
   final String provider;
@@ -32,7 +25,7 @@ class PushConfig {
     this.budgetAlertPct = 80,
     this.lastDailyPushDate,
     this.lastBudgetAlertDate,
-    this.feedbackKey = _defaultFeedbackToken,
+    this.feedbackKey = '',
     this.defaultUserName = '',
   });
 
@@ -58,7 +51,7 @@ class PushConfig {
         budgetAlertPct: (map['budget_alert_pct'] as int?) ?? 80,
         lastDailyPushDate: map['last_daily_push_date'] as String?,
         lastBudgetAlertDate: map['last_budget_alert_date'] as String?,
-        feedbackKey: _readFeedbackKey(map['feedback_key'] as String?),
+        feedbackKey: (map['feedback_key'] as String?) ?? '',
         defaultUserName: (map['default_user_name'] as String?) ?? '',
       );
 

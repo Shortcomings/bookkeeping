@@ -18,7 +18,6 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   int _type = 0;
   bool _loading = false;
   bool _syncing = false;
-  bool _hasToken = false;
   List<FeedbackItem> _history = [];
 
   @override
@@ -28,14 +27,12 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   }
 
   Future<void> _load() async {
-    final token = await _service.getToken();
     final history = await _service.getHistory();
     final savedName = await _service.getDefaultUserName();
     if (_userNameCtrl.text.isEmpty && savedName.isNotEmpty) {
       _userNameCtrl.text = savedName;
     }
     setState(() {
-      _hasToken = token.isNotEmpty;
       _history = history;
     });
   }
@@ -122,7 +119,6 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            if (!_hasToken) _buildTokenPrompt(),
             _buildForm(),
             const SizedBox(height: 24),
             if (_history.isNotEmpty) ...[
@@ -133,22 +129,6 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
               const SizedBox(height: 8),
               ..._history.map(_buildHistoryItem),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTokenPrompt() {
-    return Card(
-      color: Theme.of(context).colorScheme.primaryContainer.withAlpha(60),
-      child: const Padding(
-        padding: EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(Icons.info_outline, size: 20),
-            SizedBox(width: 12),
-            Expanded(child: Text('请在「推送与反馈设置」中配置 GitHub Token')),
           ],
         ),
       ),

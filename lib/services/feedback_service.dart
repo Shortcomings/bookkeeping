@@ -23,26 +23,21 @@ class FeedbackService {
   FeedbackService._();
 
   final _db = DatabaseHelper();
-  static const _repoOwner = 'Shortcomings';
-  static const _repoName = 'bookkeeping';
+  static const _workerUrl = 'https://bookkeeping-feedback.lzj1156433224.workers.dev';
 
   Future<String> getToken() async {
-    final config = await PushService().getConfig();
-    final key = config.feedbackKey;
-    if (key.isNotEmpty) return key;
-    return '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';
+    // Token is handled server-side by Cloudflare Worker.
+    // Kept for backward compatibility with UI that checks token availability.
+    return 'configured';
   }
 
-  /// Submit feedback: create GitHub Issue + save locally with issue number.
+  /// Submit feedback: create GitHub Issue via Worker + save locally with issue number.
   Future<String?> submitFeedback({
     required String title,
     required String content,
     required int type,
     required String userName,
   }) async {
-    final token = await getToken();
-    if (token.isEmpty) return '请先配置 GitHub Token';
-
     final typeLabel = switch (type) { 1 => 'Bug', 2 => '其他', _ => '建议' };
     final userPrefix = userName.isNotEmpty ? '[用户名：$userName] ' : '';
     final issueTitle = '$userPrefix[$typeLabel] $title';
@@ -60,12 +55,8 @@ class FeedbackService {
 
     try {
       final response = await http.post(
-        Uri.parse('https://api.github.com/repos/$_repoOwner/$_repoName/issues'),
-        headers: {
-          'Authorization': 'token $token',
-          'Content-Type': 'application/json',
-          'Accept': 'application/vnd.github.v3+json',
-        },
+        Uri.parse('$_workerUrl/issues'),
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'title': issueTitle,
           'body': issueBody.toString(),
@@ -89,9 +80,6 @@ class FeedbackService {
 
       final body = jsonDecode(response.body);
       final msg = body['message'] as String? ?? 'HTTP ${response.statusCode}';
-      if (response.statusCode == 401) return 'Token 无效或已过期';
-      if (response.statusCode == 403) return 'API 限流，请稍后重试';
-      if (response.statusCode == 404) return '仓库未找到，请检查配置';
       return msg;
     } catch (e) {
       // Offline: save locally without issue number
@@ -153,16 +141,9 @@ class FeedbackService {
   Future<List<FeedbackReply>> fetchReplies(FeedbackItem item) async {
     if (item.issueNumber == null) return [];
 
-    final token = await getToken();
-    if (token.isEmpty) return [];
-
     try {
       final response = await http.get(
-        Uri.parse('https://api.github.com/repos/$_repoOwner/$_repoName/issues/${item.issueNumber}/comments'),
-        headers: {
-          'Authorization': 'token $token',
-          'Accept': 'application/vnd.github.v3+json',
-        },
+        Uri.parse('$_workerUrl/issues/${item.issueNumber}/comments'),
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -183,22 +164,14 @@ class FeedbackService {
   Future<String> checkIssueState(FeedbackItem item) async {
     if (item.issueNumber == null) return item.issueState;
 
-    final token = await getToken();
-    if (token.isEmpty) return item.issueState;
-
     try {
       final response = await http.get(
-        Uri.parse('https://api.github.com/repos/$_repoOwner/$_repoName/issues/${item.issueNumber}'),
-        headers: {
-          'Authorization': 'token $token',
-          'Accept': 'application/vnd.github.v3+json',
-        },
+        Uri.parse('$_workerUrl/issues/${item.issueNumber}'),
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final issue = jsonDecode(response.body);
         final state = (issue['state'] as String?) ?? 'open';
-        // Update local state
         final db = await _db.database;
         await db.update('feedback', {'issue_state': state},
             where: 'id = ?', whereArgs: [item.id]);

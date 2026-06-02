@@ -14,7 +14,6 @@ class _PushSettingsScreenState extends State<PushSettingsScreen> {
   final _formKey = GlobalKey<FormState>();
   String _provider = 'serverchan';
   final _keyController = TextEditingController();
-  final _feedbackKeyController = TextEditingController();
   bool _dailySummaryEnabled = false;
   bool _budgetAlertEnabled = false;
   int _budgetAlertPct = 80;
@@ -30,7 +29,6 @@ class _PushSettingsScreenState extends State<PushSettingsScreen> {
     final config = await PushService().getConfig();
     _provider = config.provider;
     _keyController.text = config.pushKey;
-    _feedbackKeyController.text = config.feedbackKey;
     _defaultUserName = config.defaultUserName;
     _dailySummaryEnabled = config.dailySummaryEnabled;
     _budgetAlertEnabled = config.budgetAlertEnabled;
@@ -41,7 +39,6 @@ class _PushSettingsScreenState extends State<PushSettingsScreen> {
   @override
   void dispose() {
     _keyController.dispose();
-    _feedbackKeyController.dispose();
     super.dispose();
   }
 
@@ -50,7 +47,7 @@ class _PushSettingsScreenState extends State<PushSettingsScreen> {
   PushConfig _buildConfig() => PushConfig(
     provider: _provider,
     pushKey: _keyController.text.trim(),
-    feedbackKey: _feedbackKeyController.text.trim(),
+    feedbackKey: '',
     defaultUserName: _defaultUserName,
     dailySummaryEnabled: _dailySummaryEnabled,
     budgetAlertEnabled: _budgetAlertEnabled,
@@ -244,59 +241,6 @@ class _PushSettingsScreenState extends State<PushSettingsScreen> {
               ),
             ),
 
-            const SizedBox(height: 24),
-
-            // ---- GitHub Token for feedback ----
-            Text('意见反馈',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('GitHub Token', style: Theme.of(context).textTheme.titleSmall),
-                    const SizedBox(height: 4),
-                    Text(
-                      '反馈将自动创建为 GitHub Issue。\n'
-                      '在 github.com/settings/tokens 生成 Classic Token，'
-                      '勾选 repo 权限即可。',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _feedbackKeyController,
-                      decoration: const InputDecoration(
-                        labelText: 'GitHub Token',
-                        hintText: 'ghp_xxxxxxxxxxxxxxxxxxxx',
-                        border: OutlineInputBorder(),
-                      ),
-                      obscureText: true,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, size: 18, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        '推送和反馈两项配置互不影响，可分别填写。',
-                        style: TextStyle(fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: _loading ? null : _save,

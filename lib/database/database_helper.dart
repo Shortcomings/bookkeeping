@@ -36,7 +36,6 @@ class DatabaseHelper {
     if (oldVersion < 7) {
       try { await db.execute("ALTER TABLE feedback ADD COLUMN issue_number INTEGER"); } catch (_) {}
       try { await db.execute("ALTER TABLE feedback ADD COLUMN issue_state TEXT NOT NULL DEFAULT 'open'"); } catch (_) {}
-      try { await db.execute("UPDATE push_config SET feedback_key='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' WHERE feedback_key=''"); } catch (_) {}
     }
     if (oldVersion < 6) {
       await db.execute('''
@@ -430,7 +429,7 @@ class DatabaseHelper {
         budget_alert_pct INTEGER NOT NULL DEFAULT 80,
         last_daily_push_date TEXT,
         last_budget_alert_date TEXT,
-        feedback_key TEXT NOT NULL DEFAULT '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',
+        feedback_key TEXT NOT NULL DEFAULT '',
         default_user_name TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
