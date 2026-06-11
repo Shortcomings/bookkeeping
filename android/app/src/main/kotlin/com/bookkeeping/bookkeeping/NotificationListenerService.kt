@@ -1,8 +1,10 @@
 package com.bookkeeping.bookkeeping
 
 import android.app.Notification
+import android.content.pm.ApplicationInfo
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -14,11 +16,15 @@ import java.util.UUID
 class BookkeepingNotificationListener : NotificationListenerService() {
 
     companion object {
+        const val TAG = "AutoBookkeeping"
         const val WECHAT_PACKAGE = "com.tencent.mm"
         const val ALIPAY_PACKAGE = "com.eg.android.AlipayGphone"
         private const val PENDING_FILE = "pending_auto_tx.json"
         private const val MAX_PENDING = 50
     }
+
+    private val isDebug: Boolean
+        get() = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         if (sbn == null) return
@@ -28,17 +34,40 @@ class BookkeepingNotificationListener : NotificationListenerService() {
         val extras = sbn.notification.extras
         val title = extras.getString(Notification.EXTRA_TITLE) ?: ""
         val content = extras.getString(Notification.EXTRA_TEXT) ?: ""
-        if (title.isBlank() && content.isBlank()) return
+        val bigText = extras.getString(Notification.EXTRA_BIG_TEXT) ?: ""
+        val summaryText = extras.getString(Notification.EXTRA_SUMMARY_TEXT) ?: ""
 
-        val fullText = "$title $content"
+        // Some ROMs use EXTRA_TEXT_LINES (CharSequence[]) for notification content lines
+        val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+        val linesText = textLines?.joinToString(" ") ?: ""
+
+        // Combine all text sources; bigText usually has the most complete info for BigTextStyle notifications
+        val combined = listOf(title, content, bigText, summaryText, linesText)
+            .filter { it.isNotBlank() }
+            .joinToString(" ")
+
+        if (isDebug) {
+            Log.d(TAG, "Notification from ${sbn.packageName}: combined=$combined")
+        }
+
+        if (combined.isBlank()) return
+
         val sourceApp = if (packageName == WECHAT_PACKAGE) "微信" else "支付宝"
-
-        val parsed = parseNotification(fullText, sourceApp)
+        val parsed = parseNotification(combined, sourceApp)
         if (parsed != null && parsed.amountCents > 0) {
             if (!isDuplicate(parsed)) {
-                savePendingTransaction(parsed, fullText)
+                savePendingTransaction(parsed, combined)
+                if (isDebug) {
+                    Log.i(TAG, "Saved pending tx: ${parsed.merchantName} ${parsed.amountCents / 100.0}元 type=${parsed.type}")
+                }
                 notifyFlutter()
+            } else {
+                if (isDebug) {
+                    Log.d(TAG, "Duplicate tx ignored: ${parsed.merchantName}")
+                }
             }
+        } else {
+            Log.d(TAG, "parseNotification returned null for combined text")
         }
     }
 
@@ -117,7 +146,7 @@ class BookkeepingNotificationListener : NotificationListenerService() {
         return try {
             val json = JSONObject(file.readText())
             val arr = json.optJSONArray("transactions") ?: return false
-            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
 
             for (i in 0 until arr.length()) {
                 val existing = arr.getJSONObject(i)
@@ -130,7 +159,8 @@ class BookkeepingNotificationListener : NotificationListenerService() {
                 }
             }
             false
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e(TAG, "isDuplicate check failed: ${e.message}")
             false
         }
     }
@@ -139,7 +169,7 @@ class BookkeepingNotificationListener : NotificationListenerService() {
     private fun savePendingTransaction(parsed: ParsedTx, rawContent: String) {
         try {
             val file = File(filesDir, PENDING_FILE)
-            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
 
             val txJson = JSONObject().apply {
                 put("id", UUID.randomUUID().toString())
@@ -166,14 +196,24 @@ class BookkeepingNotificationListener : NotificationListenerService() {
             }
 
             file.writeText(root.toString())
-        } catch (_: Exception) {
-            // Silently fail — don't crash the notification listener
+            Log.i(TAG, "Pending tx saved, total=${arr.length()}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save pending transaction: ${e.message}")
         }
     }
 
     private fun notifyFlutter() {
         try {
-            MainActivity.eventSink?.success("pending_updated")
-        } catch (_: Exception) {}
+            val sink = MainActivity.eventSink
+            if (sink != null) {
+                sink.success("pending_updated")
+                Log.d(TAG, "Event sent to Flutter")
+            } else {
+                MainActivity.pendingEvent = true
+                Log.d(TAG, "EventSink null, set pendingEvent flag")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to notify Flutter: ${e.message}")
+        }
     }
 }

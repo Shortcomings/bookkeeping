@@ -21,6 +21,8 @@ class HomeScreen extends StatefulWidget {
 
 class HomeScreenState extends State<HomeScreen>
     with WidgetsBindingObserver {
+  bool _reviewingPending = false;
+
   void openAddTransaction() {
     final provider = context.read<TransactionProvider>();
     showModalBottomSheet(
@@ -40,13 +42,19 @@ class HomeScreenState extends State<HomeScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    AutoBookkeepingService().onPendingUpdated = _onPendingAutoTx;
     _checkPendingAutoTransactions();
   }
 
   @override
   void dispose() {
+    AutoBookkeepingService().onPendingUpdated = null;
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _onPendingAutoTx() {
+    _checkPendingAutoTransactions();
   }
 
   @override
@@ -57,11 +65,13 @@ class HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _checkPendingAutoTransactions() async {
+    if (_reviewingPending) return;
     final service = AutoBookkeepingService();
     await service.loadPendingTransactions();
     if (!mounted) return;
     if (service.pending.isEmpty) return;
 
+    _reviewingPending = true;
     final imported = await showModalBottomSheet<int>(
       context: context,
       isScrollControlled: true,
@@ -76,10 +86,18 @@ class HomeScreenState extends State<HomeScreen>
         ),
       ),
     );
+    _reviewingPending = false;
     if (imported != null && imported > 0 && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('已导入 $imported 条交易记录')),
       );
+    }
+    // Re-check in case new pending transactions arrived while the sheet was open
+    if (mounted) {
+      await service.loadPendingTransactions();
+      if (service.pending.isNotEmpty) {
+        _checkPendingAutoTransactions();
+      }
     }
   }
 

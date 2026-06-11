@@ -19,6 +19,9 @@ class MainActivity : FlutterActivity() {
 
         @Volatile
         var eventSink: EventChannel.EventSink? = null
+
+        @Volatile
+        var pendingEvent: Boolean = false
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -47,6 +50,11 @@ class MainActivity : FlutterActivity() {
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(args: Any?, sink: EventChannel.EventSink) {
                     Companion.eventSink = sink
+                    // Flush any pending event that arrived before Flutter connected
+                    if (Companion.pendingEvent) {
+                        Companion.pendingEvent = false
+                        sink.success("pending_updated")
+                    }
                 }
                 override fun onCancel(args: Any?) {
                     Companion.eventSink = null

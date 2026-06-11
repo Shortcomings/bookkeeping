@@ -42,7 +42,7 @@ class _AutoBookkeepingReviewSheetState
     int imported = 0;
 
     for (final item
-        in _items.where((i) => i.status == _ReviewStatus.pending)) {
+        in _items.where((i) => i.status != _ReviewStatus.dismissed)) {
       final success = await provider.importAutoTransaction(
         merchantName: item.pending.merchantName,
         amountCents: item.pending.amountCents,
@@ -62,10 +62,10 @@ class _AutoBookkeepingReviewSheetState
     Navigator.of(context).pop(imported);
   }
 
-  void _editItem(int index) {
+  Future<void> _editItem(int index) async {
     final item = _items[index];
-    Navigator.of(context).pop(); // dismiss review sheet first
-    showModalBottomSheet(
+    // Show edit sheet on top of review sheet (don't pop first — would invalidate context)
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -91,7 +91,7 @@ class _AutoBookkeepingReviewSheetState
     final currencyFormat =
         NumberFormat.currency(symbol: '¥', decimalDigits: 2);
     final activeItems =
-        _items.where((i) => i.status == _ReviewStatus.pending).toList();
+        _items.where((i) => i.status != _ReviewStatus.dismissed).toList();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -125,7 +125,7 @@ class _AutoBookkeepingReviewSheetState
                       .titleMedium
                       ?.copyWith(fontWeight: FontWeight.w600)),
               const Spacer(),
-              Text('${activeItems.length} 条待处理',
+              Text('${activeItems.length} 条待导入',
                   style: Theme.of(context).textTheme.bodySmall),
             ],
           ),
@@ -248,8 +248,9 @@ class _AutoBookkeepingReviewSheetState
                                 ),
                                 const SizedBox(width: 8),
                                 OutlinedButton(
-                                  onPressed: () =>
-                                      _editItem(index),
+                                  onPressed: () {
+                                    _editItem(index);
+                                  },
                                   style: OutlinedButton.styleFrom(
                                     padding:
                                         const EdgeInsets.symmetric(

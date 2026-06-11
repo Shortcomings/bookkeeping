@@ -1,7 +1,7 @@
 name: bookkeeping
 description: "一款纯净、智能的个人记账工具"
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ^3.10.8
