@@ -30,6 +30,7 @@
         <service
             android:name=".BookkeepingNotificationListener"
             android:exported="true"
+            android:process=":nl"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />

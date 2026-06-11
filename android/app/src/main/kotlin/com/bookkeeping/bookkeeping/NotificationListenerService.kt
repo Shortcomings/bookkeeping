@@ -204,14 +204,15 @@ class BookkeepingNotificationListener : NotificationListenerService() {
 
     private fun notifyFlutter() {
         try {
-            val sink = MainActivity.eventSink
-            if (sink != null) {
-                sink.success("pending_updated")
-                Log.d(TAG, "Event sent to Flutter")
+            // Use file flag for cross-process IPC (service runs in :nl process)
+            val flagFile = File(filesDir, "pending_event.flag")
+            val count = if (flagFile.exists()) {
+                flagFile.readText().toIntOrNull() ?: 0
             } else {
-                MainActivity.pendingEvent = true
-                Log.d(TAG, "EventSink null, set pendingEvent flag")
+                0
             }
+            flagFile.writeText((count + 1).toString())
+            Log.d(TAG, "Event flag set, count=${count + 1}")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to notify Flutter: ${e.message}")
         }

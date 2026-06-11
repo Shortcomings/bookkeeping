@@ -16,12 +16,10 @@ class MainActivity : FlutterActivity() {
         private const val CHANNEL = "com.bookkeeping/auto_bookkeeping"
         private const val EVENT_CHANNEL = "com.bookkeeping/auto_bookkeeping/events"
         private const val PENDING_FILE = "pending_auto_tx.json"
+        private const val EVENT_FLAG = "pending_event.flag"
 
         @Volatile
         var eventSink: EventChannel.EventSink? = null
-
-        @Volatile
-        var pendingEvent: Boolean = false
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -50,10 +48,14 @@ class MainActivity : FlutterActivity() {
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(args: Any?, sink: EventChannel.EventSink) {
                     Companion.eventSink = sink
-                    // Flush any pending event that arrived before Flutter connected
-                    if (Companion.pendingEvent) {
-                        Companion.pendingEvent = false
-                        sink.success("pending_updated")
+                    // Flush pending events from :nl process (file-based IPC)
+                    val flagFile = java.io.File(filesDir, EVENT_FLAG)
+                    if (flagFile.exists()) {
+                        val count = flagFile.readText().toIntOrNull() ?: 0
+                        if (count > 0) {
+                            flagFile.writeText("0")
+                            sink.success("pending_updated")
+                        }
                     }
                 }
                 override fun onCancel(args: Any?) {
